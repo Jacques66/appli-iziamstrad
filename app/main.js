@@ -92,6 +92,22 @@ async function loadRoms(lang) {
   return { os: sys.subarray(0, 0x4000), basic: sys.subarray(0x4000), amsdos, lang };
 }
 
+// Earlier versions shipped the examples in French; a copy saved in the browser is replaced by the
+// English example of the same program (the saved text is kept under 'backup.<family>' just in case).
+const OLD_EXAMPLE_NAMES = {
+  'bonjour.asm': 'hello.asm', 'bandes.asm': 'raster-bars.asm', 'gamme.asm': 'scale.asm', 'imprimante.asm': 'printer.asm',
+  'ecran-partage.asm': 'split-screen.asm', 'chenillard.asm': 'led-chaser.asm', 'compteur.asm': 'bcd-counter.asm', 'interruption.asm': 'interrupt.asm',
+};
+function migrateFrenchExample(fam) {
+  const name = OLD_EXAMPLE_NAMES[st.fileName] || st.fileName;
+  const ex = EXAMPLES.find(e => e.name === name);
+  const french = /[éèêàùç]/.test(st.source) && /;/.test(st.source);
+  if (!ex || (!OLD_EXAMPLE_NAMES[st.fileName] && !french) || st.source === ex.source) return;
+  store.set('backup.' + fam, { fileName: st.fileName, source: st.source });
+  st.source = ex.source; st.fileName = ex.name;
+  store.set('source.' + fam, st.source); store.set('fileName.' + fam, st.fileName);
+}
+
 async function switchMachine(kind, { keepSource = false } = {}) {
   if (!MACHINES[kind]) kind = 'cpc';
   stop('Machine change');
@@ -120,6 +136,7 @@ async function switchMachine(kind, { keepSource = false } = {}) {
   if (!keepSource) {
     st.source = store.get('source.' + fam, EXAMPLES.find(e => e.machine === fam).source);
     st.fileName = store.get('fileName.' + fam, EXAMPLES.find(e => e.machine === fam).name);
+    migrateFrenchExample(fam);
   }
   ta.value = st.source;
   $('#file-name').textContent = st.fileName;
