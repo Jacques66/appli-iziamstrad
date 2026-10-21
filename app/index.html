@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Z80 Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="chipviews.css">
+</head>
+<body>
+
+<header class="toolbar">
+  <div class="brand"><span class="logo">Z80</span>Studio</div>
+  <div class="tb-group first">
+    <button class="tb" id="btn-open" title="Ouvrir un fichier .asm (Ctrl+O)">📂</button>
+    <button class="tb" id="btn-save" title="Enregistrer le source (Ctrl+S)">💾</button>
+    <button class="tb" id="btn-bin" title="Exporter le binaire assemblé">.bin</button>
+    <input type="file" id="file-in" accept=".asm,.z80,.s,.txt" hidden>
+  </div>
+  <div class="tb-group">
+    <button class="tb" id="btn-asm" title="Assembler et charger dans la machine (F7)">⚙ Assembler</button>
+    <button class="tb run" id="btn-run" title="Exécuter / pause (F5)">▶ Exécuter</button>
+    <button class="tb" id="btn-instr" title="Pas à pas : une instruction (F10)">↷ Instruction</button>
+    <button class="tb" id="btn-tstate" title="Pas à pas : un T-state (F11)">⏱ T-state</button>
+    <button class="tb" id="btn-reset" title="Reset matériel (Ctrl+R)">⟲ Reset</button>
+  </div>
+  <div class="tb-group">
+    <label title="Machine simulée">
+      <select id="machine">
+        <option value="cpcfr">Amstrad CPC 6128 français (AZERTY)</option>
+        <option value="cpc">Amstrad CPC 6128 anglais (QWERTY)</option>
+        <option value="min">Z80 minimal (ROM · RAM · LED)</option>
+      </select>
+    </label>
+    <label title="Vitesse d'exécution">
+      <select id="speed">
+        <option value="4000000">4 MHz (temps réel)</option>
+        <option value="400000">400 kHz</option>
+        <option value="40000">40 kHz</option>
+        <option value="4000" selected>4 kHz (chenillard visible)</option>
+        <option value="400">400 Hz</option>
+        <option value="40">40 Hz (on suit les bus)</option>
+      </select>
+    </label>
+  </div>
+  <div class="badge cpu-badge" title="Processeur émulé">Z80A NMOS · 4 MHz</div>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="ph">Exemples</div>
+    <ul class="files" id="examples"></ul>
+    <div class="ph">Symboles</div>
+    <table class="symbols" id="symbols"></table>
+    <div class="ph">Configuration</div>
+    <dl class="config" id="config"></dl>
+  </aside>
+
+  <main class="workspace">
+    <div class="tabs" data-tabs="ws">
+      <button class="tab active" data-tab="editor">Éditeur</button>
+      <button class="tab" data-tab="cpu">CPU Z80A · intérieur</button>
+      <button class="tab" data-tab="board">Carte</button>
+      <button class="tab" data-tab="machine" id="tab-machine">Machine</button>
+    </div>
+
+    <section class="pane active" data-group="ws" data-name="editor">
+      <div class="filetabs">
+        <span class="ft active" id="file-name">chenillard.asm</span>
+        <span class="ft-info">Syntaxe Maxam / WinAPE · &amp;hex, #hex, $hex, %bin · F7 assemble</span>
+      </div>
+      <div class="ed" id="ed">
+        <div class="ed-gutter" id="ed-gutter"></div>
+        <div class="ed-code">
+          <pre class="ed-hl" id="ed-hl" aria-hidden="true"></pre>
+          <textarea class="ed-ta" id="ed-ta" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>
+        </div>
+      </div>
+      <div class="hint" id="hint">Cliquez dans la marge pour poser un point d'arrêt. Survolez une ligne assemblée pour voir son opcode et sa durée.</div>
+    </section>
+
+    <section class="pane" data-group="ws" data-name="cpu">
+      <div class="cpu-tools">
+        <button class="tb" id="cpu-prev" title="T-state précédent (dans l'instruction)">◀ T</button>
+        <button class="tb" id="cpu-next" title="T-state suivant (F11)">T ▶</button>
+        <button class="tb" id="cpu-instr" title="Instruction suivante (F10)">↷ Instr.</button>
+        <button class="tb" id="cpu-play" title="Animation automatique T-state par T-state">▶ Animer</button>
+        <span class="cpu-instr" id="cpu-instr-txt"></span>
+        <span class="legend">
+          <i class="lg addr"></i>adresses <i class="lg data"></i>données <i class="lg ctrl"></i>commande <i class="lg act"></i>actif
+        </span>
+      </div>
+      <div class="cpu-body">
+        <div class="cpu-svg-wrap"><svg id="cpu-svg" viewBox="0 0 1060 620"></svg></div>
+        <div class="cpu-side">
+          <div class="card"><div class="card-h" id="step-h"></div><p id="step-desc"></p></div>
+          <div class="card">
+            <div class="card-h">Bus externes</div>
+            <div class="kv"><span>A0–A15</span><b class="addr" id="step-addr"></b></div>
+            <div class="kv"><span>D0–D7</span><b class="data" id="step-data"></b></div>
+          </div>
+          <div class="card" id="alu-card"></div>
+          <div class="card" id="dec-card" hidden></div>
+          <div class="card"><div class="card-h">Signaux de commande</div><div class="pinleds" id="pinleds"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" data-group="ws" data-name="board">
+      <div class="board-body">
+        <div class="board-svg-wrap">
+          <div class="board-title" id="board-title"></div>
+          <svg id="board-svg" viewBox="0 0 1200 690"></svg>
+          <div class="wire-tip" id="wire-tip" hidden></div>
+        </div>
+        <div class="inspector" id="inspector"></div>
+      </div>
+    </section>
+
+    <section class="pane" data-group="ws" data-name="machine">
+      <div class="machine" id="mach-cpc">
+        <div class="monitor">
+          <div class="mon-tools">
+            <select id="mon-type"><option value="color">Moniteur couleur CTM644</option><option value="green">Moniteur vert GT65</option></select>
+            <label><input type="checkbox" id="scanlines" checked> Lignes de balayage</label>
+            <label title="Après F7, tape CALL &amp;adresse d'entrée dans le BASIC"><input type="checkbox" id="auto-call" checked> F7 lance le programme (CALL)</label>
+            <button class="tb" id="btn-copytext" title="Copier le texte affiché">Copier le texte</button>
+            <button class="tb" id="btn-fullscreen" title="Plein écran (double-clic sur l'écran)">⛶ Plein écran</button>
+            <span class="mon-info" id="mon-info"></span>
+          </div>
+          <div class="bezel"><div class="crt" id="crt" tabindex="0" title="Tapez au clavier du PC · double-clic : plein écran"><div class="crt-inner"><canvas id="screen" width="768" height="272"></canvas><div class="scan"></div></div><div class="fs-hint" id="fs-hint"></div></div>
+            <div class="mon-brand">AMSTRAD <span>CTM644</span><i class="pwr"></i></div></div>
+        </div>
+        <div class="periph">
+          <div class="card">
+            <div class="card-h">Lecteurs de disquettes <span class="tag">.DSK / EDSK</span></div>
+            <div id="drives"></div>
+            <input type="file" id="dsk-in" accept=".dsk" hidden>
+            <table class="cat" id="cat"></table>
+          </div>
+          <div class="card">
+            <div class="card-h">Imprimante virtuelle <span class="tag">Centronics 7 bits</span></div>
+            <div class="paper" id="paper-wrap"><pre id="paper"></pre></div>
+            <div class="row-btns"><button class="tb" id="prn-save">Enregistrer en .txt</button><button class="tb" id="prn-clear">Arracher la feuille</button><span class="muted">BASIC : PRINT #8,"…"</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h">Haut-parleur · AY-3-8912 <span class="tag">3 voix + bruit</span></div>
+            <canvas id="scope" width="520" height="110"></canvas>
+            <div class="ay" id="ay"></div>
+            <div class="row-btns"><label>Volume <input type="range" id="volume" min="0" max="100" value="60"></label><label><input type="checkbox" id="sound"> Son activé</label><span class="muted">(en temps réel seulement)</span></div>
+          </div>
+        </div>
+        <div class="keyboard-wrap">
+          <div class="card-h">Clavier CPC 6128 <span class="tag">tapez directement : le clavier du PC est relié au CPC</span><span class="muted" id="key-info"></span></div>
+          <div class="keyboard" id="keyboard"></div>
+        </div>
+      </div>
+      <div class="mini" id="mach-min">
+        <div class="card mini-card">
+          <div class="card-h">Port de sortie &amp;00 · 74LS374 → 8 LED</div>
+          <div class="leds" id="leds"></div>
+          <div class="kv mono"><span>valeur</span><b id="leds-val"></b></div>
+        </div>
+        <div class="card mini-card">
+          <div class="card-h">Port d'entrée &amp;01 · 74LS244 ← 8 interrupteurs <span class="tag">cliquez pour basculer</span></div>
+          <div class="switches" id="switches"></div>
+          <div class="kv mono"><span>valeur</span><b id="sw-val"></b></div>
+        </div>
+        <div class="card mini-card">
+          <div class="card-h">Commandes du processeur</div>
+          <div class="row-btns">
+            <button class="tb" id="m-reset">⟲ /RESET</button>
+            <button class="tb" id="m-int" title="Maintenu tant que le bouton est enfoncé">/INT (maintenir)</button>
+            <button class="tb" id="m-nmi">/NMI</button>
+          </div>
+          <p class="muted small" id="m-state"></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="ph">Registres <span class="muted" id="reg-note"></span></div>
+    <div class="regs" id="regs"></div>
+    <div class="ph">Drapeaux (F)</div>
+    <div class="flags" id="flags"></div>
+    <div class="ph">Accumulateur A</div>
+    <div class="bits" id="abits"></div>
+    <div class="ph">Interruptions</div>
+    <div class="intr" id="intr"></div>
+    <div class="ph">Pile (SP)</div>
+    <div class="stack" id="stack"></div>
+    <div class="ph">Points d'arrêt</div>
+    <div class="bplist" id="bplist"></div>
+  </aside>
+
+  <section class="dock">
+    <div class="tabs" data-tabs="dock">
+      <button class="tab active" data-tab="la">Chronogrammes</button>
+      <button class="tab" data-tab="mem">Mémoire</button>
+      <button class="tab" data-tab="dis">Désassemblage</button>
+      <button class="tab" data-tab="io">Ports E/S</button>
+      <button class="tab" data-tab="con">Console</button>
+      <button class="tb dock-toggle" id="dock-toggle" title="Replier / déplier le panneau">▾ Replier</button>
+    </div>
+    <div class="pane active" data-group="dock" data-name="la">
+      <div class="la-tools">
+        <button class="tb" id="la-zm">−</button><button class="tb" id="la-zp">+</button>
+        <span>Base de temps : <b>31,25 ns</b>/div · CLK 4 MHz</span>
+        <span id="la-cur"></span>
+        <span class="muted">Derniers cycles du bus · cliquez une ligne de la carte pour l'ajouter</span>
+      </div>
+      <div class="la">
+        <div class="la-names" id="la-names"></div>
+        <div class="la-wave" id="la-wave"><svg id="la-svg"></svg></div>
+      </div>
+    </div>
+    <div class="pane" data-group="dock" data-name="mem">
+      <div class="mem-tools">Adresse <input id="mem-addr" value="&amp;0000" size="7"> <button class="tb" data-mem="pc">PC</button><button class="tb" data-mem="sp">SP</button><button class="tb" data-mem="hl">HL</button><button class="tb" data-mem="ram">SRAM &amp;8000</button></div>
+      <div class="mem" id="mem"></div>
+    </div>
+    <div class="pane" data-group="dock" data-name="dis"><div class="dis" id="dis"></div></div>
+    <div class="pane" data-group="dock" data-name="io"><div class="io" id="io"></div></div>
+    <div class="pane" data-group="dock" data-name="con"><pre class="console" id="console"></pre></div>
+  </section>
+</div>
+
+<footer class="statusbar" id="status"></footer>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-h"><span id="modal-title"></span><button class="tb" id="modal-close">✕</button></div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>

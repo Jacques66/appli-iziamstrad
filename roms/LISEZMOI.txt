@@ -1,0 +1,20 @@
+ROM de l'Amstrad CPC 6128 utilisées par Z80 Studio
+
+cpc6128.rom  32 768 octets  système (firmware, &0000) + Locomotive BASIC 1.1 (ROM haute 0)
+             sha1 5977adbad3f7c1e0e082cd02fe76a700d9860c30
+amsdos.rom   16 384 octets  AMSDOS (ROM haute 7)
+             sha1 39102c8e9cb55fcc0b9b62098780ed4a3cb6a4bb
+
+Source : dépôt de l'émulateur Caprice32, https://github.com/ColinPitrat/caprice32 (dossier rom/),
+téléchargées le 21/10/2026.
+
+Copyright Amstrad Consumer Electronics plc et Locomotive Software Ltd.
+Amstrad a autorisé la redistribution de ces ROM pour l'émulation, en conservant son copyright.
+
+Version française (clavier AZERTY, caractères é è à ç ù °)
+cpc6128fr-os.rom     16 384 octets  système 6128 français (OS v3, bannière « f3 »)
+                     sha1 bd8babbd211fd434fd06ef225fa4602d142a25c7
+cpc6128fr-basic.rom  16 384 octets  BASIC 1.1 de la version française
+                     sha1 fec906f9026cd52bdaa7d6731a47f2c5989bcdf5
+Source : dépôt de l'émulateur Sugarbox, https://github.com/Tom1975/SugarboxV2 (Sugarbox/ROM/),
+téléchargées le 21/10/2026. L'AMSDOS de ce dépôt est identique à amsdos.rom ci-dessus.

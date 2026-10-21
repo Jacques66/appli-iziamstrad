@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Z80 Studio — maquette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="toolbar">
+  <div class="brand"><span class="logo">Z80</span>Studio</div>
+  <nav class="menus">
+    <span>Fichier</span><span>Édition</span><span>Assembler</span><span>Exécuter</span><span>Machine</span><span>Affichage</span><span>Aide</span>
+  </nav>
+  <div class="tb-group">
+    <button class="tb" title="Assembler (F7)">⚙ Assembler</button>
+    <button class="tb run" title="Exécuter (F5)">▶ Exécuter</button>
+    <button class="tb" title="Pause (F6)">❚❚</button>
+    <button class="tb" id="tb-instr" title="Pas à pas : une instruction (F10)">↷ Instruction</button>
+    <button class="tb" id="tb-tstate" title="Pas à pas : un T-state (F11)">⏱ T-state</button>
+    <button class="tb" title="Reset matériel">⟲ Reset</button>
+  </div>
+  <div class="tb-group">
+    <label title="Machine simulée">
+      <select id="machine">
+        <option value="cpc">Amstrad CPC 6128</option>
+        <option value="min">Z80 minimal (ROM · RAM · LED)</option>
+      </select>
+    </label>
+    <label title="Vitesse d'exécution">
+      <select>
+        <option>4 MHz (temps réel)</option>
+        <option>1 kHz</option>
+        <option>10 Hz (animation)</option>
+        <option>Manuelle</option>
+      </select>
+    </label>
+  </div>
+  <div class="badge" title="Maquette : données fictives">MAQUETTE</div>
+</header>
+
+<div class="layout">
+
+  <!-- ============ Colonne gauche ============ -->
+  <aside class="sidebar">
+    <div class="ph">Projet · bonjour</div>
+    <ul class="files">
+      <li class="active"><span class="fi asm">ASM</span>bonjour.asm</li>
+      <li><span class="fi inc">INC</span>firmware.inc</li>
+      <li><span class="fi bin">BIN</span>bonjour.bin <em>41 o</em></li>
+      <li><span class="fi dsk">DSK</span>demo.dsk <em>A:</em></li>
+      <li><span class="fi prn">PRN</span>imprimante.txt</li>
+    </ul>
+    <div class="ph">Symboles</div>
+    <table class="symbols" id="symbols"></table>
+    <div class="ph">Configuration</div>
+    <dl class="config" id="config"></dl>
+  </aside>
+
+  <!-- ============ Zone centrale ============ -->
+  <main class="workspace">
+    <div class="tabs" data-tabs="ws">
+      <button class="tab active" data-tab="editor">Éditeur</button>
+      <button class="tab" data-tab="cpu">CPU Z80 · intérieur</button>
+      <button class="tab" data-tab="board">Carte mère</button>
+      <button class="tab" data-tab="machine">Machine · écran &amp; périphériques</button>
+    </div>
+
+    <!-- Éditeur -->
+    <section class="pane active" data-group="ws" data-name="editor">
+      <div class="filetabs">
+        <span class="ft active">bonjour.asm <b>●</b></span><span class="ft">firmware.inc</span>
+        <span class="ft-info">Syntaxe Maxam / WinAPE · &amp;hex, #hex, $hex</span>
+      </div>
+      <div class="code" id="code"></div>
+      <div class="hint" id="hint">Survolez une instruction pour voir son opcode, sa durée et les drapeaux affectés.</div>
+    </section>
+
+    <!-- CPU intérieur -->
+    <section class="pane" data-group="ws" data-name="cpu">
+      <div class="cpu-tools">
+        <button class="tb" id="cpu-first" title="Début">⏮</button>
+        <button class="tb" id="cpu-prev" title="T-state précédent">◀ T</button>
+        <button class="tb" id="cpu-next" title="T-state suivant">T ▶</button>
+        <button class="tb" id="cpu-play" title="Animation automatique">▶ Animer</button>
+        <span class="cpu-instr" id="cpu-instr"></span>
+        <span class="legend">
+          <i class="lg addr"></i>adresses <i class="lg data"></i>données <i class="lg ctrl"></i>commande <i class="lg act"></i>actif à ce T-state
+        </span>
+      </div>
+      <div class="cpu-body">
+        <div class="cpu-svg-wrap"><svg id="cpu-svg" viewBox="0 0 1060 620"></svg></div>
+        <div class="cpu-side">
+          <div class="card">
+            <div class="card-h" id="step-h"></div>
+            <p id="step-desc"></p>
+          </div>
+          <div class="card">
+            <div class="card-h">Bus externes</div>
+            <div class="kv"><span>A0–A15</span><b class="addr" id="step-addr"></b></div>
+            <div class="kv"><span>D0–D7</span><b class="data" id="step-data"></b></div>
+          </div>
+          <div class="card">
+            <div class="card-h">Signaux de commande</div>
+            <div class="pinleds" id="pinleds"></div>
+          </div>
+          <div class="card small">Cliquez sur un bloc pour le mettre en évidence ; le chronogramme du bas suit le T-state courant.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Carte mère -->
+    <section class="pane" data-group="ws" data-name="board">
+      <div class="board-body">
+        <div class="board-svg-wrap">
+          <div class="board-title" id="board-title"></div>
+          <svg id="board-svg" viewBox="0 0 1200 690"></svg>
+          <div class="wire-tip" id="wire-tip" hidden></div>
+        </div>
+        <div class="inspector" id="inspector"></div>
+      </div>
+    </section>
+
+    <!-- Machine -->
+    <section class="pane" data-group="ws" data-name="machine">
+      <div class="machine">
+        <div class="monitor">
+          <div class="mon-tools">
+            <select id="mon-type"><option value="color">Moniteur couleur CTM644</option><option value="green">Moniteur vert GT65</option></select>
+            <label><input type="checkbox" id="scanlines" checked> Lignes de balayage</label>
+            <select id="screen-state"><option value="now">État actuel (pause à &amp;4003)</option><option value="end">Après exécution du programme</option></select>
+            <span class="mon-info">Mode 1 · 320×200 · 4 couleurs · 50 Hz</span>
+          </div>
+          <div class="bezel"><div class="crt"><canvas id="screen" width="768" height="544"></canvas><div class="scan"></div></div>
+            <div class="mon-brand">AMSTRAD <span>CTM644</span><i class="pwr"></i></div></div>
+        </div>
+        <div class="periph">
+          <div class="card">
+            <div class="card-h">Lecteurs de disquettes <span class="tag">.DSK / EDSK</span></div>
+            <div class="drive"><div class="slot"><span class="disk">demo.dsk</span></div><i class="led on"></i>
+              <div class="drv-info"><b>A:</b> demo.dsk · 178 Ko · format DATA<br><span class="muted">Piste 00 · Secteur &amp;C1 · moteur en marche</span></div></div>
+            <div class="drive"><div class="slot empty"><span>glisser un .dsk</span></div><i class="led"></i>
+              <div class="drv-info"><b>B:</b> vide<br><span class="muted">Insérer… · Nouvelle disquette formatée</span></div></div>
+            <table class="cat"><tr><th>Catalogue A:</th><th>Taille</th></tr>
+              <tr><td>BONJOUR .BIN</td><td>1K</td></tr><tr><td>BONJOUR .BAS</td><td>1K</td></tr><tr><td>DEMO    .BIN</td><td>12K</td></tr></table>
+          </div>
+          <div class="card">
+            <div class="card-h">Imprimante virtuelle <span class="tag">Centronics · DMP2000</span></div>
+            <div class="paper"><pre id="paper"></pre></div>
+            <div class="row-btns"><button class="tb">Enregistrer en PDF</button><button class="tb">Enregistrer en .txt</button><button class="tb">Arracher la feuille</button></div>
+          </div>
+          <div class="card">
+            <div class="card-h">Haut-parleur · AY-3-8912 <span class="tag">3 voix + bruit</span></div>
+            <canvas id="scope" width="520" height="110"></canvas>
+            <div class="ay" id="ay"></div>
+            <div class="row-btns"><label>Volume <input type="range" value="70"></label><label><input type="checkbox" checked> Son activé</label></div>
+          </div>
+        </div>
+        <div class="keyboard-wrap">
+          <div class="card-h">Clavier CPC 6128 <span class="tag">cliquez ou tapez au clavier du PC</span><span class="muted" id="key-info"></span></div>
+          <div class="keyboard" id="keyboard"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ Colonne droite ============ -->
+  <aside class="rightbar">
+    <div class="ph">Registres <span class="muted" id="reg-note"></span></div>
+    <div class="regs" id="regs"></div>
+    <div class="ph">Drapeaux (F)</div>
+    <div class="flags" id="flags"></div>
+    <div class="ph">Accumulateur A</div>
+    <div class="bits" id="abits"></div>
+    <div class="ph">Interruptions</div>
+    <div class="intr"><span>IM <b>1</b></span><span>IFF1 <b>1</b></span><span>IFF2 <b>1</b></span><span>HALT <b>0</b></span></div>
+    <div class="ph">Pile (SP)</div>
+    <div class="stack" id="stack"></div>
+    <div class="ph">Points d'arrêt</div>
+    <div class="bplist" id="bplist"></div>
+    <div class="ph">Expressions</div>
+    <div class="watch" id="watch"></div>
+  </aside>
+
+  <!-- ============ Dock bas ============ -->
+  <section class="dock">
+    <div class="tabs" data-tabs="dock">
+      <button class="tab active" data-tab="la">Chronogrammes</button>
+      <button class="tab" data-tab="mem">Mémoire</button>
+      <button class="tab" data-tab="dis">Désassemblage</button>
+      <button class="tab" data-tab="io">Ports E/S</button>
+      <button class="tab" data-tab="con">Console</button>
+      <button class="tb dock-toggle" id="dock-toggle" title="Replier / déplier le panneau">▾ Replier</button>
+    </div>
+    <div class="pane active" data-group="dock" data-name="la">
+      <div class="la-tools">
+        <button class="tb" id="la-zm">−</button><button class="tb" id="la-zp">+</button>
+        <span>Déclenchement : <b>/M1 ↓</b> à <b>&amp;4003</b></span>
+        <span>Base de temps : <b>31,25 ns</b>/div · CLK 4 MHz</span>
+        <span id="la-cur"></span>
+        <span class="muted">Cliquez une ligne de la carte mère pour l'ajouter ici</span>
+        <button class="tb" style="margin-left:auto">Exporter .VCD</button>
+      </div>
+      <div class="la">
+        <div class="la-names" id="la-names"></div>
+        <div class="la-wave" id="la-wave"><svg id="la-svg"></svg></div>
+      </div>
+    </div>
+    <div class="pane" data-group="dock" data-name="mem"><div class="mem" id="mem"></div></div>
+    <div class="pane" data-group="dock" data-name="dis"><div class="dis" id="dis"></div></div>
+    <div class="pane" data-group="dock" data-name="io"><div class="io" id="io"></div></div>
+    <div class="pane" data-group="dock" data-name="con"><pre class="console" id="console"></pre></div>
+  </section>
+</div>
+
+<footer class="statusbar" id="status"></footer>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-h"><span id="modal-title"></span><button class="tb" id="modal-close">✕</button></div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script src="maquette.js"></script>
+</body>
+</html>

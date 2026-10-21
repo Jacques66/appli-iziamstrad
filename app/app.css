@@ -1,0 +1,85 @@
+/* Compléments de l'application (la base vient de la maquette) */
+.tb-group.first { border-left: 0; padding-left: 0; }
+.cpu-badge { color: #9fd8ff; border-color: #1d4a66; background: #0f2233; }
+.mono { font-family: var(--mono); }
+.small { font-size: 12px; }
+
+/* Éditeur : textarea transparente au-dessus du texte coloré */
+.ed { flex: 1; min-height: 0; overflow: auto; display: flex; background: var(--panel2); font: 13px/21px var(--mono); }
+.ed-gutter { flex: none; padding: 6px 0; position: sticky; left: 0; z-index: 2; background: var(--panel2); border-right: 1px solid var(--line); }
+.ed-gutter .g { display: grid; grid-template-columns: 22px 34px 46px 100px; height: 21px; white-space: pre; }
+.ed-gutter .g.cur { background: #3a3215; box-shadow: inset 3px 0 var(--active); }
+.ed-gutter .g.err { background: #3a1517; }
+.ed-gutter .g.err .no { color: var(--err); }
+.ed-gutter.stale .ad, .ed-gutter.stale .by { opacity: .35; }
+.ed-code { position: relative; flex: 1; min-width: max-content; padding: 6px 12px 6px 8px; }
+.ed-hl, .ed-ta { margin: 0; font: inherit; white-space: pre; tab-size: 8; letter-spacing: 0; }
+.ed-hl { pointer-events: none; min-height: 100%; }
+.ed-hl .cur { background: #3a321566; display: inline-block; min-width: 100%; }
+.ed-ta { position: absolute; inset: 6px 12px 6px 8px; width: calc(100% - 20px); height: calc(100% - 12px); resize: none; border: 0; outline: 0; padding: 0;
+  background: transparent; color: transparent; caret-color: #fff; overflow: hidden; }
+.ed-ta::selection { background: #4fc3f744; color: transparent; }
+.hint .err { color: var(--err); }
+
+/* Machine minimale */
+.mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; padding: 12px; align-content: start; }
+.mini-card { display: flex; flex-direction: column; gap: 10px; }
+.leds, .switches { display: flex; gap: 10px; justify-content: space-between; }
+.led8 { display: flex; flex-direction: column; align-items: center; gap: 5px; font: 10px var(--mono); color: var(--muted); }
+.led8 i { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5a1a1a, #2a0b0b); border: 2px solid #1a1a1a; transition: all .05s; }
+.led8.on i { background: radial-gradient(circle at 35% 30%, #ffd0c8, #ff3b2f 45%, #b3150c); box-shadow: 0 0 14px #ff3b2f, 0 0 4px #ff8a80; }
+.sw8 { display: flex; flex-direction: column; align-items: center; gap: 5px; font: 10px var(--mono); color: var(--muted); cursor: pointer; user-select: none; }
+.sw8 i { width: 20px; height: 38px; border-radius: 4px; background: #222; border: 1px solid #444; position: relative; }
+.sw8 i::after { content: ''; position: absolute; left: 2px; right: 2px; height: 16px; top: 18px; border-radius: 3px; background: linear-gradient(#ddd, #999); transition: top .1s; }
+.sw8.on i::after { top: 2px; background: linear-gradient(#bfe6ff, #4fc3f7); }
+#m-int.on { background: #3a3215; border-color: var(--active); color: var(--active); }
+
+/* Carte : activité en direct */
+.wg.live .wire { filter: drop-shadow(0 0 5px currentColor); stroke-width: 6 !important; }
+.chip.live > rect.body { stroke: var(--active); stroke-width: 2.5; filter: drop-shadow(0 0 8px #ffd54f88); }
+
+/* Dock */
+.mem-tools { display: flex; gap: 6px; align-items: center; padding: 5px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); flex: none; }
+.mem-tools input { background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 2px 6px; font: 12px var(--mono); }
+.mem-tools .tb { padding: 1px 8px; }
+.mem .hx span.sp { outline: 1px dashed var(--muted); }
+.dis tr { cursor: pointer; }
+.dis tr:hover { background: #ffffff08; }
+.dis td.bp { width: 14px; }
+.dis td.bp i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--err); }
+.console .err { color: var(--err); cursor: pointer; }
+.console .err:hover { text-decoration: underline; }
+.r b { cursor: text; }
+.r input { width: 52px; background: #0c0f13; color: var(--active); border: 1px solid var(--active); border-radius: 3px; font: 600 13px var(--mono); text-align: right; }
+.statusbar .st-run { color: var(--ok); }
+
+/* CPC 6128 */
+[hidden] { display: none !important; }
+#screen { width: 100%; height: auto; aspect-ratio: 768 / 544; image-rendering: pixelated; }
+.crt:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+.drv-btns { display: inline-flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.drv-btns .tb { padding: 1px 7px; font-size: 11.5px; }
+.drv-info .w { color: var(--warn); }
+.paper { min-height: 150px; }
+.paper pre { min-height: 130px; white-space: pre-wrap; }
+.key { cursor: pointer; }
+.key.two { flex-direction: column; gap: 0; line-height: 1; height: 28px; }
+.key.two small { font-size: 8.5px; color: #c9c9d1; font-weight: 600; }
+
+/* Plein écran du moniteur */
+.crt-inner { position: relative; }
+.crt:fullscreen { display: flex; align-items: center; justify-content: center; background: #000; border: 0; border-radius: 0; outline: none; }
+.crt:fullscreen .crt-inner { width: min(100vw, calc(100vh * 768 / 544)); }
+.crt:fullscreen .scan { border-radius: 0; }
+.fs-hint { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); background: #000c; color: #ddd; border: 1px solid #444; border-radius: 6px; padding: 6px 14px; font: 13px var(--sans); pointer-events: none; opacity: 0; transition: opacity .6s; }
+.fs-hint.show { opacity: 1; }
+
+/* Vue CPU détaillée : valeurs en mouvement */
+.tok rect { stroke-width: 1.2; filter: drop-shadow(0 0 4px #000); }
+.tok text { font: 700 11px var(--mono); }
+.tok.addr rect { fill: #0d2a44; stroke: var(--addr); } .tok.addr text { fill: #9fd2ff; }
+.tok.data rect { fill: #3a2505; stroke: var(--data); } .tok.data text { fill: #ffd39a; }
+.tok.ctrl rect { fill: #2b1636; stroke: var(--ctrl); } .tok.ctrl text { fill: #e6b8f2; }
+.card .big { font-size: 14px; font-weight: 700; color: #eef3fa; margin: 4px 0 6px; }
+.card .big.now { color: var(--active); }
+.modal.wide .modal-box { width: min(1180px, 96vw); max-height: 92vh; }
