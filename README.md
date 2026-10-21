@@ -5,6 +5,8 @@ assembleur, exécution pas à pas (instruction ou T-state), vue animée de
 l'intérieur du CPU (UAL, registres, séquenceur, bus internes), carte cliquable
 avec chronogrammes des signaux, machine avec ses périphériques.
 
+En ligne : https://jacques66.github.io/appli-iziamstrad/
+
 ## Contenu
 
 | Dossier | Rôle |
