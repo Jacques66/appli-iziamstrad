@@ -1,6 +1,6 @@
-/* Amstrad CPC 6128 : Z80A à 4 MHz, Gate Array 40010, PAL 40030 (128 Ko), CRTC 6845,
-   PPI 8255, PSG AY-3-8912, FDC µPD765A, port imprimante 74LS273.
-   Les ROM (OS 6128, BASIC 1.1, AMSDOS) sont fournies au constructeur. */
+/* Amstrad CPC 6128: Z80A at 4 MHz, Gate Array 40010, PAL 40030 (128 KB), CRTC 6845,
+   PPI 8255, PSG AY-3-8912, FDC µPD765A, 74LS273 printer port.
+   The ROMs (OS 6128, BASIC 1.1, AMSDOS) are passed to the constructor. */
 import { Z80 } from '../z80/cpu.js';
 import { CRTC6845 } from './cpc/crtc.js';
 import { GateArray } from './cpc/gatearray.js';
@@ -9,13 +9,13 @@ import { AY38912 } from './cpc/psg.js';
 import { FDC765 } from './cpc/fdc.js';
 import { NATIONAL, buildKeymap } from './cpc/keymap.js';
 
-// configurations RAM du PAL : banque de 16 Ko placée dans chaque quart de l'espace adressable
+// PAL RAM configurations: 16 KB bank placed in each quarter of the address space
 const RAM_CONFIG = [[0, 1, 2, 3], [0, 1, 2, 7], [4, 5, 6, 7], [0, 3, 2, 7], [0, 4, 2, 3], [0, 5, 2, 3], [0, 6, 2, 3], [0, 7, 2, 3]];
-export const FRAME_T = 312 * 64 * 4;   // T-states par trame (19 968 µs)
+export const FRAME_T = 312 * 64 * 4;   // T-states per frame (19,968 µs)
 
 export class CPC6128 {
   constructor({ os, basic, amsdos, lang = 'uk' }) {
-    this.name = lang === 'fr' ? 'Amstrad CPC 6128 (français)' : 'Amstrad CPC 6128';
+    this.name = lang === 'fr' ? 'Amstrad CPC 6128 (French)' : 'Amstrad CPC 6128';
     this.os = os; this.basic = basic; this.amsdos = amsdos;
     this.lang = lang;
     this.charset = NATIONAL[lang];
@@ -57,7 +57,7 @@ export class CPC6128 {
   }
   get upperRomData() { return this.romSelect === 7 ? this.amsdos : this.basic; }
 
-  /* ---------- Bus mémoire ---------- */
+  /* ---------- Memory bus ---------- */
   read(a) {
     const blk = a >> 14;
     if (blk === 0 && this.ga.lowerRom) return this.os[a];
@@ -65,9 +65,9 @@ export class CPC6128 {
     return this.ram[this.bank[blk] | (a & 0x3FFF)];
   }
   write(a, v) {
-    this.ram[this.bank[a >> 14] | (a & 0x3FFF)] = v;   // les écritures vont toujours en RAM
+    this.ram[this.bank[a >> 14] | (a & 0x3FFF)] = v;   // writes always go to RAM
   }
-  // nom du circuit lu à cette adresse (vue mémoire, carte)
+  // name of the chip read at this address (memory view, board)
   chipAt(a) {
     const blk = a >> 14;
     if (blk === 0 && this.ga.lowerRom) return 'ROM OS';
@@ -75,7 +75,7 @@ export class CPC6128 {
     return 'RAM ' + (this.bank[blk] >> 14);
   }
 
-  /* ---------- Bus d'E/S : décodage partiel des lignes d'adresse ---------- */
+  /* ---------- I/O bus: partial decoding of the address lines ---------- */
   out(port, v) {
     this.logIO('out', port, v);
     if ((port & 0xC000) === 0x4000) { this.ga.write(v); if (v >> 6 === 3) this.updateMap(); }
@@ -122,14 +122,14 @@ export class CPC6128 {
       case 0:
         if (p.control & 0x10) return this.psg.bus((p.c >> 7) & 1, (p.c >> 6) & 1, 0xFF, this.cpu.cycles) ?? 0xFF;
         return p.a;
-      // port B : bit 0 VSYNC, bits 1–3 = 7 (Amstrad), bit 4 = 50 Hz, bit 5 /EXP, bit 6 BUSY imprimante, bit 7 cassette
+      // port B: bit 0 VSYNC, bits 1–3 = 7 (Amstrad), bit 4 = 50 Hz, bit 5 /EXP, bit 6 printer BUSY, bit 7 tape
       case 1: return 0x3E | (this.crtc.vsync ? 1 : 0);
       case 2: return p.c;
       default: return 0xFF;
     }
   }
 
-  /* ---------- Port imprimante (D0–D6 + /STROBE en bit 7) ---------- */
+  /* ---------- Printer port (D0–D6 + /STROBE on bit 7) ---------- */
   printerWrite(v) {
     const s = v & 0x80;
     if (s && !this.printer.strobe) {
@@ -140,8 +140,8 @@ export class CPC6128 {
     this.printer.strobe = s;
   }
 
-  /* ---------- Exécution ---------- */
-  // une instruction ; le Gate Array aligne chaque instruction sur un multiple de 4 T-states (partage de la RAM avec la vidéo)
+  /* ---------- Execution ---------- */
+  // one instruction; the Gate Array aligns each instruction on a multiple of 4 T-states (RAM shared with the video)
   step() {
     this.cpu.irq(this.ga.intRequest);
     const cpu = this.cpu, t = cpu.step(), tt = (t + 3) & ~3;
@@ -158,7 +158,7 @@ export class CPC6128 {
     while (this.frames === f && this.cpu.cycles - start < FRAME_T * 2) this.step();
   }
 
-  // injecte du code assemblé directement en RAM (64 Ko de base)
+  // injects assembled code straight into RAM (base 64 KB)
   load(segments) {
     for (const s of segments) s.bytes.forEach((v, i) => { this.ram[(s.start + i) & 0xFFFF] = v; });
   }

@@ -1,7 +1,7 @@
-/* Système Z80 minimal : oscillateur 4 MHz, EPROM 2764 (8 Ko, &0000–&1FFF),
-   SRAM 6264 (8 Ko, &8000–&9FFF) décodées par un 74LS138 sur A13–A15,
-   port de sortie &00 (74LS374 → 8 LED) et port d'entrée &01 (74LS244 ← 8 interrupteurs).
-   Les ports ne décodent que A0 et /IORQ, comme sur le schéma. */
+/* Minimal Z80 system: 4 MHz oscillator, 2764 EPROM (8 KB, &0000–&1FFF),
+   6264 SRAM (8 KB, &8000–&9FFF) decoded by a 74LS138 on A13–A15,
+   output port &00 (74LS374 → 8 LEDs) and input port &01 (74LS244 ← 8 switches).
+   The ports only decode A0 and /IORQ, as on the schematic. */
 import { Z80 } from '../z80/cpu.js';
 
 export const ROM_START = 0x0000, ROM_SIZE = 0x2000;
@@ -14,12 +14,12 @@ export class MinimalMachine {
     this.ram = new Uint8Array(RAM_SIZE);
     this.leds = 0;
     this.switches = 0x00;
-    this.io = [];            // dernières opérations d'E/S { dir, port, value, t }
+    this.io = [];            // latest I/O operations { dir, port, value, t }
     this.cpu = new Z80(this);
     this.reset();
   }
 
-  // Décodeur 74LS138 : Y0 = EPROM, Y4 = SRAM, le reste n'est pas câblé
+  // 74LS138 decoder: Y0 = EPROM, Y4 = SRAM, the rest is not wired
   chipAt(addr) {
     addr &= 0xFFFF;
     if (addr < ROM_START + ROM_SIZE) return 'rom';
@@ -31,12 +31,12 @@ export class MinimalMachine {
     const c = this.chipAt(addr);
     if (c === 'rom') return this.rom[addr - ROM_START];
     if (c === 'ram') return this.ram[addr - RAM_START];
-    return 0xFF;               // bus flottant (résistances de tirage)
+    return 0xFF;               // floating bus (pull-up resistors)
   }
   write(addr, v) {
     addr &= 0xFFFF;
     if (this.chipAt(addr) === 'ram') this.ram[addr - RAM_START] = v & 0xFF;
-    // écriture en EPROM ou hors mémoire : ignorée
+    // write to EPROM or outside memory: ignored
   }
   in(port) {
     const v = port & 1 ? this.switches : 0xFF;
@@ -54,7 +54,7 @@ export class MinimalMachine {
 
   step() { return this.cpu.step(); }
 
-  // « Programme » l'EPROM et/ou la RAM avec une image mémoire (segments de l'assembleur)
+  // 'Programs' the EPROM and/or the RAM with a memory image (assembler segments)
   load(segments) {
     this.rom.fill(0xFF);
     for (const s of segments) s.bytes.forEach((v, i) => {

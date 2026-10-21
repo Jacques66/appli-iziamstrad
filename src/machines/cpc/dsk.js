@@ -1,14 +1,14 @@
-/* Images de disquettes .DSK (CPCEMU) — formats standard et étendu.
+/* .DSK floppy disk images (CPCEMU) — standard and extended formats.
 
-   Disk = { sides, tracks: [face][piste] = Track | null, creator, dirty, name? }
+   Disk = { sides, tracks: [side][track] = Track | null, creator, dirty, name? }
    Track = { track, side, gap3, filler, sectors: [{ C, H, R, N, st1, st2, data }] }
 
-   Format standard : « MV - CPCEMU Disk-File\r\nDisk-Info\r\n », taille de piste
-   commune (en-tête compris) en 0x32–0x33, secteurs de 128 << N octets (N de la piste).
-   Format étendu : « EXTENDED CPC DSK File\r\nDisk-Info\r\n », table des tailles de
-   pistes (en unités de 256 octets) en 0x34, taille réelle de chaque secteur dans
-   l'en-tête de piste ; une taille nulle désigne une piste absente.
-   Les pistes sont rangées piste 0 face 0, piste 0 face 1, piste 1 face 0… */
+   Standard format: 'MV - CPCEMU Disk-File\r\nDisk-Info\r\n', common track size
+   (header included) at 0x32–0x33, sectors of 128 << N bytes (N of the track).
+   Extended format: 'EXTENDED CPC DSK File\r\nDisk-Info\r\n', table of track sizes
+   (in units of 256 bytes) at 0x34, actual size of each sector in the
+   track header; a zero size means a missing track.
+   Tracks are stored track 0 side 0, track 0 side 1, track 1 side 0… */
 
 const SIG_STD = 'MV - CPC';
 const SIG_EXT = 'EXTENDED';
@@ -26,22 +26,22 @@ const putAscii = (b, start, s, max = s.length) => {
   for (let i = 0; i < Math.min(s.length, max); i++) b[start + i] = s.charCodeAt(i) & 0xFF;
 };
 
-// Taille de l'en-tête de piste : 256 octets, davantage au-delà de 29 secteurs
+// Track header size: 256 bytes, more beyond 29 sectors
 const trackHeaderSize = count => Math.max(0x100, Math.ceil((0x18 + 8 * count) / 0x100) * 0x100);
 
 export function parseDSK(bytes) {
   const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  if (b.length < 0x100) throw new Error(`Fichier DSK invalide : ${b.length} octets, l'en-tête en exige 256`);
+  if (b.length < 0x100) throw new Error(`Invalid DSK file: ${b.length} bytes, the header requires 256`);
   const sig = ascii(b, 0, 8);
   const extended = sig === SIG_EXT;
-  if (!extended && sig !== SIG_STD) throw new Error('Fichier DSK invalide : signature « MV - CPCEMU » ou « EXTENDED CPC DSK » absente');
+  if (!extended && sig !== SIG_STD) throw new Error("Invalid DSK file: missing 'MV - CPCEMU' or 'EXTENDED CPC DSK' signature");
 
   const creator = ascii(b, 0x22, 14).replace(/[\0 ]+$/, '');
   const nTracks = b[0x30], sides = b[0x31];
-  if (sides < 1 || sides > 2) throw new Error(`Fichier DSK invalide : ${sides} faces annoncées`);
-  if (extended && nTracks * sides > 0x100 - 0x34) throw new Error(`Fichier DSK invalide : ${nTracks} pistes, trop pour la table des tailles`);
+  if (sides < 1 || sides > 2) throw new Error(`Invalid DSK file: ${sides} sides declared`);
+  if (extended && nTracks * sides > 0x100 - 0x34) throw new Error(`Invalid DSK file: ${nTracks} tracks, too many for the size table`);
   const stdSize = b[0x32] | (b[0x33] << 8);
-  if (!extended && nTracks > 0 && stdSize < 0x100) throw new Error(`Fichier DSK invalide : taille de piste ${stdSize}`);
+  if (!extended && nTracks > 0 && stdSize < 0x100) throw new Error(`Invalid DSK file: track size ${stdSize}`);
 
   const tracks = [];
   for (let s = 0; s < sides; s++) tracks.push([]);
@@ -50,7 +50,7 @@ export function parseDSK(bytes) {
     for (let s = 0; s < sides; s++) {
       const size = extended ? b[0x34 + t * sides + s] * 0x100 : stdSize;
       if (size === 0) { tracks[s].push(null); continue; }
-      if (off + size > b.length) throw new Error(`Fichier DSK tronqué : piste ${t} face ${s} incomplète`);
+      if (off + size > b.length) throw new Error(`Truncated DSK file: track ${t} side ${s} incomplete`);
       tracks[s].push(parseTrack(b, off, size, extended, t, s));
       off += size;
     }
@@ -59,16 +59,16 @@ export function parseDSK(bytes) {
 }
 
 function parseTrack(b, off, size, extended, t, s) {
-  if (ascii(b, off, 10) !== 'Track-Info') throw new Error(`Fichier DSK invalide : en-tête « Track-Info » absent pour la piste ${t} face ${s}`);
+  if (ascii(b, off, 10) !== 'Track-Info') throw new Error(`Invalid DSK file: missing 'Track-Info' header for track ${t} side ${s}`);
   const trackN = b[off + 0x14], count = b[off + 0x15];
   const end = off + size;
   let ptr = off + trackHeaderSize(count);
-  if (off + 0x18 + 8 * count > end) throw new Error(`Fichier DSK invalide : table des secteurs de la piste ${t} face ${s} hors de la piste`);
+  if (off + 0x18 + 8 * count > end) throw new Error(`Invalid DSK file: sector table of track ${t} side ${s} outside the track`);
   const sectors = [];
   for (let k = 0; k < count; k++) {
     const i = off + 0x18 + 8 * k;
     const len = extended ? b[i + 6] | (b[i + 7] << 8) : Math.min(0x80 << Math.min(trackN, 8), 0x1800);
-    if (ptr + len > end) throw new Error(`Fichier DSK invalide : secteur ${k} de la piste ${t} face ${s} hors de la piste`);
+    if (ptr + len > end) throw new Error(`Invalid DSK file: sector ${k} of track ${t} side ${s} outside the track`);
     sectors.push({ C: b[i], H: b[i + 1], R: b[i + 2], N: b[i + 3], st1: b[i + 4], st2: b[i + 5], data: b.slice(ptr, ptr + len) });
     ptr += len;
   }
@@ -77,12 +77,12 @@ function parseTrack(b, off, size, extended, t, s) {
 
 export function writeDSK(disk) {
   const sides = disk.sides;
-  if (sides < 1 || sides > 2) throw new Error(`Disque invalide : ${sides} faces`);
+  if (sides < 1 || sides > 2) throw new Error(`Invalid disk: ${sides} sides`);
   let nTracks = 0;
   for (let s = 0; s < sides; s++) nTracks = Math.max(nTracks, (disk.tracks[s] || []).length);
-  if (nTracks * sides > 0x100 - 0x34) throw new Error(`Disque invalide : ${nTracks} pistes, trop pour le format étendu`);
+  if (nTracks * sides > 0x100 - 0x34) throw new Error(`Invalid disk: ${nTracks} tracks, too many for the extended format`);
 
-  // Taille de chaque bloc de piste, arrondie à 256 octets
+  // Size of each track block, rounded up to 256 bytes
   const blocks = [];
   for (let t = 0; t < nTracks; t++) {
     for (let s = 0; s < sides; s++) {
@@ -91,7 +91,7 @@ export function writeDSK(disk) {
       let size = trackHeaderSize(trk.sectors.length);
       for (const sec of trk.sectors) size += sec.data.length;
       size = Math.ceil(size / 0x100) * 0x100;
-      if (size > 0xFF00) throw new Error(`Disque invalide : piste ${t} face ${s} trop grande (${size} octets)`);
+      if (size > 0xFF00) throw new Error(`Invalid disk: track ${t} side ${s} too large (${size} bytes)`);
       blocks.push({ trk, size, t, s });
     }
   }
@@ -128,14 +128,14 @@ export function writeDSK(disk) {
   return out;
 }
 
-// Ordre physique des secteurs à l'entrelacement 2 utilisé par l'AMSDOS au formatage
+// Physical sector order with the interleave of 2 used by AMSDOS when formatting
 const INTERLEAVE = [0, 5, 1, 6, 2, 7, 3, 8, 4];
 
 export function blankDisk(format = 'data') {
   let first;
   if (format === 'data') first = 0xC1;
   else if (format === 'system') first = 0x41;
-  else throw new Error(`Format de disque inconnu : « ${format} » (attendu « data » ou « system »)`);
+  else throw new Error(`Unknown disk format: '${format}' (expected 'data' or 'system')`);
   const side = [];
   for (let t = 0; t < 40; t++) {
     const sectors = INTERLEAVE.map(k => ({

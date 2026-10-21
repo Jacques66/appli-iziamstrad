@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Z80, FC, FN, FPV, FX, FH, FY, FZ, FS } from '../src/z80/cpu.js';
 
-// Machine de test : 64 Ko de RAM, ports enregistrés
+// Test machine: 64 KB of RAM, recorded ports
 function machine(bytes = [], at = 0) {
   const mem = new Uint8Array(0x10000);
   mem.set(bytes, at);
@@ -19,7 +19,7 @@ function machine(bytes = [], at = 0) {
 }
 const run = (cpu, n) => { let t = 0; for (let i = 0; i < n; i++) t += cpu.step(); return t; };
 
-test('ADD A,B : débordement signé', () => {
+test('ADD A,B: signed overflow', () => {
   const { cpu } = machine([0x80]);           // ADD A,B
   cpu.a = 0x7F; cpu.b = 0x01;
   assert.equal(cpu.step(), 4);
@@ -35,7 +35,7 @@ test('SUB 1 depuis 0 : emprunt', () => {
   assert.equal(cpu.f, FS | FY | FH | FX | FN | FC);
 });
 
-test('CP : A inchangé, X/Y pris dans l\'opérande', () => {
+test('CP: A unchanged, X/Y taken from the operand', () => {
   const { cpu } = machine([0xFE, 0x28]);     // CP &28
   cpu.a = 0x10;
   cpu.step();
@@ -43,7 +43,7 @@ test('CP : A inchangé, X/Y pris dans l\'opérande', () => {
   assert.equal(cpu.f, FS | FY | FH | FX | FN | FC);
 });
 
-test('DAA après addition BCD 15 + 27 = 42', () => {
+test('DAA after BCD addition 15 + 27 = 42', () => {
   const { cpu } = machine([0xC6, 0x27, 0x27]); // ADD A,&27 ; DAA
   cpu.a = 0x15;
   run(cpu, 2);
@@ -51,7 +51,7 @@ test('DAA après addition BCD 15 + 27 = 42', () => {
   assert.equal(cpu.f, FH | FPV);
 });
 
-test('DAA après soustraction BCD 42 - 15 = 27', () => {
+test('DAA after BCD subtraction 42 - 15 = 27', () => {
   const { cpu } = machine([0xD6, 0x15, 0x27]); // SUB &15 ; DAA
   cpu.a = 0x42;
   run(cpu, 2);
@@ -60,7 +60,7 @@ test('DAA après soustraction BCD 42 - 15 = 27', () => {
   assert.equal(cpu.f & FN, FN);
 });
 
-test('INC / DEC 8 bits : V, H, retenue conservée', () => {
+test('8-bit INC / DEC: V, H, carry preserved', () => {
   const { cpu } = machine([0x3C, 0x05]);     // INC A ; DEC B
   cpu.a = 0x7F; cpu.b = 0x80; cpu.f = FC;
   cpu.step();
@@ -71,7 +71,7 @@ test('INC / DEC 8 bits : V, H, retenue conservée', () => {
   assert.equal(cpu.f, FY | FH | FX | FPV | FN | FC);
 });
 
-test('NEG de &80', () => {
+test('NEG of &80', () => {
   const { cpu } = machine([0xED, 0x44]);
   cpu.a = 0x80;
   assert.equal(cpu.step(), 8);
@@ -79,7 +79,7 @@ test('NEG de &80', () => {
   assert.equal(cpu.f, FS | FPV | FN | FC);
 });
 
-test('ADD HL,DE et SBC HL,DE', () => {
+test('ADD HL,DE and SBC HL,DE', () => {
   const { cpu } = machine([0x19, 0xED, 0x52]); // ADD HL,DE ; SBC HL,DE
   cpu.hl = 0x8000; cpu.de = 0x8000; cpu.f = 0;
   assert.equal(cpu.step(), 11);
@@ -91,7 +91,7 @@ test('ADD HL,DE et SBC HL,DE', () => {
   assert.equal(cpu.f, FS | FY | FH | FX | FN | FC);
 });
 
-test('rotations de A et préfixe CB', () => {
+test('rotations of A and CB prefix', () => {
   const { cpu } = machine([0x07, 0xCB, 0x38, 0xCB, 0x30]); // RLCA ; SRL B ; SLL B
   cpu.a = 0x81; cpu.b = 0x03; cpu.f = 0;
   cpu.step();
@@ -102,7 +102,7 @@ test('rotations de A et préfixe CB', () => {
   assert.equal(cpu.b, 0x03);
 });
 
-test('BIT 7,H et BIT 0,(HL)', () => {
+test('BIT 7,H and BIT 0,(HL)', () => {
   const { cpu, mem } = machine([0xCB, 0x7C, 0xCB, 0x46]);
   cpu.h = 0x80; cpu.l = 0x00; cpu.f = FC;
   cpu.step();
@@ -112,7 +112,7 @@ test('BIT 7,H et BIT 0,(HL)', () => {
   assert.equal(cpu.f & (FZ | FPV), FZ | FPV);
 });
 
-test('LD et accès indexés IX : valeurs et T-states', () => {
+test('LD and IX indexed access: values and T-states', () => {
   const { cpu, mem } = machine([
     0xDD, 0x21, 0x00, 0x40,       // LD IX,&4000      14
     0xDD, 0x36, 0x02, 0x55,       // LD (IX+2),&55    19
@@ -128,7 +128,7 @@ test('LD et accès indexés IX : valeurs et T-states', () => {
   assert.equal(cpu.a, 0x00);
 });
 
-test('DDCB : SET 0,(IX+1),B copie le résultat dans B (non documenté)', () => {
+test('DDCB: SET 0,(IX+1),B copies the result into B (undocumented)', () => {
   const { cpu, mem } = machine([0xDD, 0xCB, 0x01, 0xC0]);
   cpu.ix = 0x5000; mem[0x5001] = 0x10;
   assert.equal(cpu.step(), 23);
@@ -154,18 +154,18 @@ test('PUSH / POP / CALL / RET', () => {
   assert.equal(cpu.af, 0x1234);
 });
 
-test('sauts relatifs et DJNZ : T-states pris / non pris', () => {
+test('relative jumps and DJNZ: T-states taken / not taken', () => {
   const { cpu } = machine([0x06, 0x02, 0x10, 0xFE, 0x28, 0x00, 0x20, 0xFE]);
   cpu.step();                         // LD B,2
-  assert.equal(cpu.step(), 13);       // DJNZ $ (B=1, saut)
-  assert.equal(cpu.step(), 8);        // DJNZ $ (B=0, continue)
+  assert.equal(cpu.step(), 13);       // DJNZ $ (B=1, jump)
+  assert.equal(cpu.step(), 8);        // DJNZ $ (B=0, falls through)
   cpu.f = 0;
-  assert.equal(cpu.step(), 7);        // JR Z (non pris)
-  assert.equal(cpu.step(), 12);       // JR NZ,$ (pris)
+  assert.equal(cpu.step(), 7);        // JR Z (not taken)
+  assert.equal(cpu.step(), 12);       // JR NZ,$ (taken)
   assert.equal(cpu.pc, 0x0006);
 });
 
-test('LDIR copie 3 octets en 58 T', () => {
+test('LDIR copies 3 bytes in 58 T', () => {
   const { cpu, mem } = machine([0xED, 0xB0]);
   mem.set([1, 2, 3], 0x8000);
   cpu.hl = 0x8000; cpu.de = 0x9000; cpu.bc = 3;
@@ -177,7 +177,7 @@ test('LDIR copie 3 octets en 58 T', () => {
   assert.equal(cpu.f & FPV, 0);
 });
 
-test('CPIR s\'arrête sur l\'octet trouvé', () => {
+test('CPIR stops on the byte found', () => {
   const { cpu, mem } = machine([0xED, 0xB1]);
   mem.set([7, 8, 9, 10], 0x8000);
   cpu.hl = 0x8000; cpu.bc = 4; cpu.a = 9;
@@ -196,7 +196,7 @@ test('RLD', () => {
   assert.equal(mem[0x8000], 0x1A);
 });
 
-test('E/S : OUT (n),A, OUT (C),0 (NMOS), IN r,(C)', () => {
+test('I/O: OUT (n),A, OUT (C),0 (NMOS), IN r,(C)', () => {
   const { cpu, io } = machine([0xD3, 0xFE, 0xED, 0x71, 0xED, 0x78]);
   cpu.a = 0x12; cpu.bc = 0x7F10; io.inValue = 0x00;
   assert.equal(cpu.step(), 11);
@@ -207,7 +207,7 @@ test('E/S : OUT (n),A, OUT (C),0 (NMOS), IN r,(C)', () => {
   assert.equal(cpu.f & (FZ | FPV), FZ | FPV);
 });
 
-test('EX AF,AF\' et EXX', () => {
+test('EX AF,AF\' and EXX', () => {
   const { cpu } = machine([0x08, 0xD9]);
   cpu.af = 0x1122; cpu.a_ = 0x33; cpu.f_ = 0x44;
   cpu.bc = 0xAAAA; cpu.b_ = 0x55; cpu.c_ = 0x66;
@@ -217,20 +217,20 @@ test('EX AF,AF\' et EXX', () => {
   assert.equal(cpu.b_, 0xAA);
 });
 
-test('interruption IM 1 : retardée d\'une instruction après EI, 13 T', () => {
+test('IM 1 interrupt: delayed by one instruction after EI, 13 T', () => {
   const { cpu } = machine([0xED, 0x56, 0xFB, 0x00, 0x00]);  // IM 1 ; EI ; NOP ; NOP
   cpu.sp = 0x9000;
   cpu.step(); cpu.step();
   cpu.irq(true);
-  assert.equal(cpu.step(), 4);       // le NOP suivant EI s'exécute
+  assert.equal(cpu.step(), 4);       // the NOP after EI executes
   assert.equal(cpu.pc, 4);
-  assert.equal(cpu.step(), 13);      // acceptation
+  assert.equal(cpu.step(), 13);      // acceptance
   assert.equal(cpu.pc, 0x0038);
   assert.equal(cpu.iff1, 0);
   assert.equal(cpu.bus.read(0x8FFE), 0x04);
 });
 
-test('interruption IM 2 : vecteur I·données, 19 T', () => {
+test('IM 2 interrupt: vector I·data, 19 T', () => {
   const { cpu, mem } = machine([0xED, 0x5E, 0xFB, 0x00]);
   cpu.sp = 0x9000; cpu.i = 0x80;
   mem[0x80FE] = 0x34; mem[0x80FF] = 0x12;
@@ -240,7 +240,7 @@ test('interruption IM 2 : vecteur I·données, 19 T', () => {
   assert.equal(cpu.pc, 0x1234);
 });
 
-test('HALT puis interruption : reprise après le HALT', () => {
+test('HALT then interrupt: resumes after the HALT', () => {
   const { cpu } = machine([0xFB, 0x76, 0x00]);
   cpu.sp = 0x9000; cpu.im = 1;
   cpu.step(); cpu.step();
@@ -254,7 +254,7 @@ test('HALT puis interruption : reprise après le HALT', () => {
   assert.equal(cpu.bus.read(0x8FFE), 0x02);
 });
 
-test('NMI : saut en &0066, IFF2 conservé, 11 T', () => {
+test('NMI: jump to &0066, IFF2 preserved, 11 T', () => {
   const { cpu } = machine([0x00]);
   cpu.sp = 0x9000; cpu.iff1 = cpu.iff2 = 1;
   cpu.nmi();
@@ -264,7 +264,7 @@ test('NMI : saut en &0066, IFF2 conservé, 11 T', () => {
   assert.equal(cpu.iff2, 1);
 });
 
-test('bug NMOS de LD A,I : P/V à 0 si interruption acceptée juste après', () => {
+test('NMOS bug of LD A,I: P/V at 0 if an interrupt is accepted right after', () => {
   const { cpu } = machine([0xED, 0x57]);
   cpu.sp = 0x9000; cpu.im = 1; cpu.iff1 = cpu.iff2 = 1;
   cpu.step();
@@ -274,14 +274,14 @@ test('bug NMOS de LD A,I : P/V à 0 si interruption acceptée juste après', () 
   assert.equal(cpu.f & FPV, 0);
 });
 
-test('registre R : 7 bits incrémentés à chaque M1, préfixes compris', () => {
+test('R register: 7 bits incremented on each M1, prefixes included', () => {
   const { cpu } = machine([0x00, 0xDD, 0x23, 0xCB, 0x00]);
   cpu.r = 0xFE;
   run(cpu, 3);
   assert.equal(cpu.r, 0x80 | ((0x7E + 5) & 0x7F));
 });
 
-test('trace des cycles machine de LD A,(HL)', () => {
+test('machine cycle trace of LD A,(HL)', () => {
   const { cpu, mem } = machine([0x7E]);
   cpu.hl = 0x4019; mem[0x4019] = 0x42; cpu.i = 0; cpu.r = 0x2E;
   cpu.trace = [];
@@ -290,7 +290,7 @@ test('trace des cycles machine de LD A,(HL)', () => {
   assert.equal(cpu.trace[0].refresh, 0x002F);
 });
 
-test('la trace totalise toujours les T-states de l\'instruction', () => {
+test('the trace always adds up to the instruction T-states', () => {
   const prog = [0xDD, 0xCB, 0x01, 0x46, 0xED, 0xB0, 0xE3, 0xCD, 0x00, 0x80];
   const { cpu } = machine(prog);
   cpu.ix = 0x6000; cpu.bc = 2; cpu.hl = 0x7000; cpu.de = 0x7100; cpu.sp = 0x9000;

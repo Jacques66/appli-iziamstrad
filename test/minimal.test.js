@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MinimalMachine } from '../src/machines/minimal.js';
 
-test('décodage mémoire : EPROM non modifiable, SRAM en &8000, bus flottant ailleurs', () => {
+test('memory decoding: read-only EPROM, SRAM at &8000, floating bus elsewhere', () => {
   const m = new MinimalMachine();
   m.load([{ start: 0, bytes: new Uint8Array([0x3E, 0x55]) }]);
   m.write(0x0000, 0x00);
@@ -14,7 +14,7 @@ test('décodage mémoire : EPROM non modifiable, SRAM en &8000, bus flottant ail
   assert.equal(m.read(0x4000), 0xFF);
 });
 
-test('programme : OUT (&00) allume les LED, IN (&01) lit les interrupteurs', () => {
+test('program: OUT (&00) lights the LEDs, IN (&01) reads the switches', () => {
   const m = new MinimalMachine();
   m.switches = 0xA5;
   // IN A,(&01) ; CPL ; OUT (&00),A ; HALT

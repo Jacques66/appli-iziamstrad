@@ -1,10 +1,10 @@
-/* Compléments de l'application (la base vient de la maquette) */
+/* Application additions (the base comes from the mockup) */
 .tb-group.first { border-left: 0; padding-left: 0; }
 .cpu-badge { color: #9fd8ff; border-color: #1d4a66; background: #0f2233; }
 .mono { font-family: var(--mono); }
 .small { font-size: 12px; }
 
-/* Éditeur : textarea transparente au-dessus du texte coloré */
+/* Editor: transparent textarea over the highlighted text */
 .ed { flex: 1; min-height: 0; overflow: auto; display: flex; background: var(--panel2); font: 13px/21px var(--mono); }
 .ed-gutter { flex: none; padding: 6px 0; position: sticky; left: 0; z-index: 2; background: var(--panel2); border-right: 1px solid var(--line); }
 .ed-gutter .g { display: grid; grid-template-columns: 22px 34px 46px 100px; height: 21px; white-space: pre; }
@@ -21,7 +21,7 @@
 .ed-ta::selection { background: #4fc3f744; color: transparent; }
 .hint .err { color: var(--err); }
 
-/* Machine minimale */
+/* Minimal machine */
 .mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; padding: 12px; align-content: start; }
 .mini-card { display: flex; flex-direction: column; gap: 10px; }
 .leds, .switches { display: flex; gap: 10px; justify-content: space-between; }
@@ -34,7 +34,7 @@
 .sw8.on i::after { top: 2px; background: linear-gradient(#bfe6ff, #4fc3f7); }
 #m-int.on { background: #3a3215; border-color: var(--active); color: var(--active); }
 
-/* Carte : activité en direct */
+/* Board: live activity */
 .wg.live .wire { filter: drop-shadow(0 0 5px currentColor); stroke-width: 6 !important; }
 .chip.live > rect.body { stroke: var(--active); stroke-width: 2.5; filter: drop-shadow(0 0 8px #ffd54f88); }
 
@@ -66,7 +66,7 @@
 .key.two { flex-direction: column; gap: 0; line-height: 1; height: 28px; }
 .key.two small { font-size: 8.5px; color: #c9c9d1; font-weight: 600; }
 
-/* Plein écran du moniteur */
+/* Monitor full screen */
 .crt-inner { position: relative; }
 .crt:fullscreen { display: flex; align-items: center; justify-content: center; background: #000; border: 0; border-radius: 0; outline: none; }
 .crt:fullscreen .crt-inner { width: min(100vw, calc(100vh * 768 / 544)); }
@@ -74,7 +74,7 @@
 .fs-hint { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); background: #000c; color: #ddd; border: 1px solid #444; border-radius: 6px; padding: 6px 14px; font: 13px var(--sans); pointer-events: none; opacity: 0; transition: opacity .6s; }
 .fs-hint.show { opacity: 1; }
 
-/* Vue CPU détaillée : valeurs en mouvement */
+/* Detailed CPU view: moving values */
 .tok rect { stroke-width: 1.2; filter: drop-shadow(0 0 4px #000); }
 .tok text { font: 700 11px var(--mono); }
 .tok.addr rect { fill: #0d2a44; stroke: var(--addr); } .tok.addr text { fill: #9fd2ff; }

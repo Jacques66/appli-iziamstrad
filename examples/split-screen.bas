@@ -1,14 +1,14 @@
-10 ' Ecran partage : MODE 0 en haut, MODE 1 en bas (interruptions)
+10 ' Split screen: MODE 0 at the top, MODE 1 at the bottom (interrupts)
 20 MEMORY &7FFF
 30 MODE 1:BORDER 1:INK 0,1:INK 1,24:INK 2,20:INK 3,6
 40 INK 4,2:INK 5,3:INK 6,8:INK 7,9:INK 8,11:INK 9,13:INK 10,15:INK 11,16:INK 12,18:INK 13,21:INK 14,25:INK 15,26
 50 s=0:FOR a=&8000 TO &808B:READ o$:o=VAL("&"+o$):POKE a,o:s=s+o:NEXT
-60 IF s<>15015 THEN PRINT "Erreur dans les DATA":END
-70 LOCATE 1,14:PRINT "En haut : MODE 0, 16 couleurs."
-80 PRINT "En bas : MODE 1, texte lisible."
-90 PRINT "Le Gate Array change de mode deux fois"
-100 PRINT "par trame, sur ses interruptions."
-110 PRINT:PRINT "CALL &8003 pour arreter."
+60 IF s<>15015 THEN PRINT "Error in DATA":END
+70 LOCATE 1,14:PRINT "Top: MODE 0, 16 colors."
+80 PRINT "Bottom: MODE 1, readable text."
+90 PRINT "The Gate Array switches mode twice"
+100 PRINT "per frame, on its interrupts."
+110 PRINT:PRINT "CALL &8003 to stop."
 120 CALL &8000
 130 END
 140 DATA C3,06,80,C3,23,80,CD,50,80,21,8D,80,06,81,0E,00

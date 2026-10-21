@@ -1,6 +1,6 @@
-/* Z80 Studio — tests du désassembleur.
-   Chaque cas : octets, texte attendu, T-states, et options (adresse, longueur
-   si elle diffère du nombre d'octets fournis, cible, type de flot). */
+/* Z80 Studio — disassembler tests.
+   Each case: bytes, expected text, T-states, and options (address, length
+   if it differs from the number of bytes given, target, flow type). */
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +27,7 @@ function check([hexBytes, text, tstates, opts = {}]) {
   assert.equal(d.addr, at, label);
   if ('target' in opts) assert.equal(d.target, opts.target, label);
   if ('flow' in opts) assert.equal(d.flow, opts.flow, label);
-  // mnémonique et opérandes cohérents avec le texte
+  // mnemonic and operands consistent with the text
   const rebuilt = d.operands.length ? `${d.mnemonic} ${d.operands.join(',')}` : d.mnemonic;
   assert.equal(rebuilt, d.text, label);
 }
@@ -38,7 +38,7 @@ function suite(name, cases) {
   });
 }
 
-suite('table non préfixée', [
+suite('unprefixed table', [
   ['00', 'NOP', 4, { target: null, flow: null }],
   ['01 34 12', 'LD BC,&1234', 10],
   ['02', 'LD (BC),A', 7],
@@ -183,7 +183,7 @@ suite('table non préfixée', [
   ['FF', 'RST &38', 11, { target: 0x38, flow: 'rst' }],
 ]);
 
-suite('table CB', [
+suite('CB table', [
   ['CB 00', 'RLC B', 8],
   ['CB 06', 'RLC (HL)', 15],
   ['CB 07', 'RLC A', 8],
@@ -219,7 +219,7 @@ suite('table CB', [
   ['CB FF', 'SET 7,A', 8, { target: null, flow: null }],
 ]);
 
-suite('table ED', [
+suite('ED table', [
   ['ED 40', 'IN B,(C)', 12],
   ['ED 48', 'IN C,(C)', 12],
   ['ED 70', 'IN F,(C)', 12],
@@ -288,7 +288,7 @@ suite('table ED', [
   ['ED B9', 'CPDR', [21, 16]],
   ['ED BA', 'INDR', [21, 16]],
   ['ED BB', 'OTDR', [21, 16], { flow: null }],
-  // opcodes non définis : deux octets de données
+  // undefined opcodes: two data bytes
   ['ED 77 00', 'DB &ED,&77', 8, { len: 2 }],
   ['ED 7F 00', 'DB &ED,&7F', 8, { len: 2 }],
   ['ED 00 00', 'DB &ED,&00', 8, { len: 2 }],
@@ -301,7 +301,7 @@ suite('table ED', [
   ['ED FF 00', 'DB &ED,&FF', 8, { len: 2, target: null, flow: null }],
 ]);
 
-suite('table DD', [
+suite('DD table', [
   ['DD 09', 'ADD IX,BC', 15],
   ['DD 19', 'ADD IX,DE', 15],
   ['DD 29', 'ADD IX,IX', 15],
@@ -359,7 +359,7 @@ suite('table DD', [
   ['DD E5', 'PUSH IX', 15],
   ['DD E9', 'JP (IX)', 8, { target: null, flow: 'jump' }],
   ['DD F9', 'LD SP,IX', 10],
-  // préfixe sans effet : un octet de données, puis reprise
+  // prefix without effect: one data byte, then decoding resumes
   ['DD 00', 'DB &DD', 4, { len: 1 }],
   ['DD 01 34 12', 'DB &DD', 4, { len: 1 }],
   ['DD 3E 05', 'DB &DD', 4, { len: 1 }],
@@ -376,7 +376,7 @@ suite('table DD', [
   ['DD ED B0', 'DB &DD', 4, { len: 1 }],
 ]);
 
-suite('table FD', [
+suite('FD table', [
   ['FD 09', 'ADD IY,BC', 15],
   ['FD 29', 'ADD IY,IY', 15],
   ['FD 21 00 40', 'LD IY,&4000', 14],
@@ -414,7 +414,7 @@ suite('table FD', [
   ['FD ED 44', 'DB &FD', 4, { len: 1 }],
 ]);
 
-suite('table DDCB', [
+suite('DDCB table', [
   ['DD CB 05 06', 'RLC (IX+&05)', 23],
   ['DD CB 02 00', 'RLC (IX+&02),B', 23],
   ['DD CB 02 07', 'RLC (IX+&02),A', 23],
@@ -446,7 +446,7 @@ suite('table DDCB', [
   ['DD CB 80 F8', 'SET 7,(IX-&80),B', 23, { target: null, flow: null }],
 ]);
 
-suite('table FDCB', [
+suite('FDCB table', [
   ['FD CB 02 06', 'RLC (IY+&02)', 23],
   ['FD CB 02 01', 'RLC (IY+&02),C', 23],
   ['FD CB FE 2E', 'SRA (IY-&02)', 23],
@@ -460,9 +460,9 @@ suite('table FDCB', [
   ['FD CB 7F DA', 'SET 3,(IY+&7F),D', 23],
 ]);
 
-describe('balayage des 256 opcodes de chaque table', () => {
+describe('sweep of the 256 opcodes of every table', () => {
   const prefixes = {
-    'non préfixée': [],
+    unprefixed: [],
     CB: [0xCB],
     ED: [0xED],
     DD: [0xDD],
@@ -471,7 +471,7 @@ describe('balayage des 256 opcodes de chaque table', () => {
     FDCB: [0xFD, 0xCB, 0xFB],
   };
   const expectedLength = {
-    'non préfixée': [1, 3],
+    unprefixed: [1, 3],
     CB: [2, 2],
     ED: [2, 4],
     DD: [1, 4],
@@ -500,7 +500,7 @@ describe('balayage des 256 opcodes de chaque table', () => {
     });
   }
 
-  test('ED : 178 opcodes non définis', () => {
+  test('ED: 178 undefined opcodes', () => {
     let undefinedCount = 0;
     for (let op = 0; op < 256; op++) {
       const d = disassemble(memory([0xED, op, 0, 0]), 0);
@@ -513,7 +513,7 @@ describe('balayage des 256 opcodes de chaque table', () => {
     assert.equal(undefinedCount, 178);
   });
 
-  test('DD/FD : préfixe sans effet si le sans-préfixe ignore HL, H, L et (HL)', () => {
+  test('DD/FD: prefix without effect if the unprefixed opcode ignores HL, H, L and (HL)', () => {
     const usesHL = /\b(HL|H|L)\b|\(HL\)/;
     for (const prefix of [0xDD, 0xFD]) {
       for (let op = 0; op < 256; op++) {
@@ -523,7 +523,7 @@ describe('balayage des 256 opcodes de chaque table', () => {
         const inert = [0xDD, 0xED, 0xFD, 0xEB].includes(op) || !usesHL.test(plain.text);
         assert.equal(d.mnemonic === 'DB', inert, `${prefix.toString(16)} ${op.toString(16)}`);
         if (inert) assert.equal(d.length, 1);
-        // (HL) prend un octet de déplacement, sauf dans JP (HL)
+        // (HL) takes a displacement byte, except in JP (HL)
         const withDisp = plain.text.includes('(HL)') && op !== 0xE9;
         if (!inert) assert.equal(d.length, plain.length + 1 + (withDisp ? 1 : 0));
       }
@@ -531,12 +531,12 @@ describe('balayage des 256 opcodes de chaque table', () => {
   });
 });
 
-describe('programme et plages', () => {
+describe('programs and ranges', () => {
   const program = parse(
     '21 19 40 7E B7 28 06 CD 5A BB 23 18 F6 06 06 48 CD 38 BC 3E 07 CD 5A BB C9',
   );
 
-  test('programme de démonstration à partir de &4000', () => {
+  test('demo program from &4000', () => {
     const list = disassembleRange(memory(program, 0x4000), 0x4000, 13);
     assert.deepEqual(list.map(d => d.text), [
       'LD HL,&4019',
@@ -565,14 +565,14 @@ describe('programme et plages', () => {
     assert.equal(list[12].flow, 'ret');
   });
 
-  test('le décodage reprend après un préfixe sans effet', () => {
+  test('decoding resumes after a prefix without effect', () => {
     const list = disassembleRange(memory(parse('DD 3E 05 FD DD 21 00 C0'), 0), 0, 3);
     assert.deepEqual(list.map(d => d.text), ['DB &DD', 'LD A,&05', 'DB &FD']);
     const next = disassemble(memory(parse('DD 3E 05 FD DD 21 00 C0'), 0), 4);
     assert.equal(next.text, 'LD IX,&C000');
   });
 
-  test('lecture circulaire en fin de mémoire', () => {
+  test('wrap-around read at the end of memory', () => {
     const read = memory(parse('C3 00 01'), 0xFFFF);
     const d = disassemble(read, 0xFFFF);
     assert.equal(d.text, 'JP &0100');
@@ -581,7 +581,7 @@ describe('programme et plages', () => {
     assert.equal(list[1].addr, 0x0002);
   });
 
-  test('adresse masquée sur 16 bits', () => {
+  test('address masked to 16 bits', () => {
     const d = disassemble(memory([0x00], 0), 0x10000);
     assert.equal(d.addr, 0);
     assert.equal(d.text, 'NOP');

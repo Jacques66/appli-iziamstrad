@@ -1,14 +1,14 @@
 import { hex } from './util.js';
 
-/* Vue CPU détaillée : pour chaque T-state, les valeurs qui circulent sur les bus internes
-   (« transferts » animés le long d'itinéraires), le calcul de l'UAL et le décodage de l'opcode. */
+/* Detailed CPU view: for each T-state, the values travelling on the internal buses
+   ("transfers" animated along routes), the ALU computation and the opcode decoding. */
 
 const PAIRS = { BC: ['B', 'C'], DE: ['D', 'E'], HL: ['H', 'L'], AF: ['A', 'F'] };
 const pair = (r, n) => PAIRS[n] ? (r[PAIRS[n][0]] << 8) | r[PAIRS[n][1]] : r[n];
 const REG8 = new Set(['A', 'B', 'C', 'D', 'E', 'H', 'L']);
 const W16 = new Set(['BC', 'DE', 'HL', 'SP', 'IX', 'IY']);
 
-// itinéraires des valeurs (coordonnées de la vue CPU, voir cpuview.js)
+// value routes (coordinates of the CPU view, see cpuview.js)
 export const ROUTES = {
   'in-db': 'M1010,485 H935',
   'db-out': 'M935,485 H1010',
@@ -34,7 +34,7 @@ export const ROUTES = {
 const ALU_SYM = { ADD: '+', ADC: '+', SUB: '−', SBC: '−', AND: 'AND', OR: 'OR', XOR: 'XOR', CP: '−' };
 const lastOf = (trace, type) => [...trace].reverse().find(c => c.type === type);
 
-// valeur d'un opérande au début de l'instruction
+// value of an operand at the start of the instruction
 function operand(op, before, trace) {
   if (!op) return null;
   if (REG8.has(op)) return before[op];
@@ -44,10 +44,10 @@ function operand(op, before, trace) {
 }
 const flagStr = f => ['S', 'Z', 'Y', 'H', 'X', 'P', 'N', 'C'].map((n, i) => `${n}${(f >> (7 - i)) & 1}`).join(' ');
 
-/* Calcul effectué par l'UAL, reconstitué à partir des registres avant / après */
+/* Computation performed by the ALU, reconstructed from the registers before / after */
 export function aluInfo(d, before, after, trace) {
   const m = d.mnemonic, ops = d.operands;
-  const info = { op: m, acc: null, tmp: null, result: null, expr: '', flags: before.F !== after.F ? `${flagStr(before.F)} → ${flagStr(after.F)}` : 'drapeaux inchangés', dest: null };
+  const info = { op: m, acc: null, tmp: null, result: null, expr: '', flags: before.F !== after.F ? `${flagStr(before.F)} → ${flagStr(after.F)}` : 'flags unchanged', dest: null };
   if (ALU_SYM[m]) {
     const src = ops.length === 2 ? ops[1] : ops[0];
     if (W16.has(ops[0]) && ops.length === 2) {              // ADD/ADC/SBC HL,rr
@@ -60,56 +60,56 @@ export function aluInfo(d, before, after, trace) {
     const r = m === 'CP' ? (a - b) & 0xFF : after.A;
     const c = m === 'ADC' || m === 'SBC' ? ` ${ALU_SYM[m]} C(${before.F & 1})` : '';
     Object.assign(info, { acc: a, tmp: b, result: r, dest: m === 'CP' ? null : 'A',
-      expr: b == null ? `${m} ${ops.join(',')}` : `${hex(a)} ${ALU_SYM[m]} ${hex(b)}${c} = ${hex(r)}${m === 'CP' ? '  (comparaison : A n\'est pas modifié)' : ''}` });
+      expr: b == null ? `${m} ${ops.join(',')}` : `${hex(a)} ${ALU_SYM[m]} ${hex(b)}${c} = ${hex(r)}${m === 'CP' ? '  (compare: A is not modified)' : ''}` });
     return info;
   }
   if (m === 'INC' || m === 'DEC') {
     const t = ops[0], s = m === 'INC' ? '+ 1' : '− 1';
-    if (W16.has(t)) { const a = pair(before, t), r = pair(after, t); return Object.assign(info, { acc: a, tmp: 1, result: r, w16: true, dest: t, expr: `${hex(a, 4)} ${s} = ${hex(r, 4)}  (incrémenteur 16 bits, sans drapeaux)` }); }
+    if (W16.has(t)) { const a = pair(before, t), r = pair(after, t); return Object.assign(info, { acc: a, tmp: 1, result: r, w16: true, dest: t, expr: `${hex(a, 4)} ${s} = ${hex(r, 4)}  (16-bit incrementer, no flags)` }); }
     if (REG8.has(t)) return Object.assign(info, { acc: before[t], tmp: 1, result: after[t], dest: t, expr: `${hex(before[t])} ${s} = ${hex(after[t])}` });
     const v = lastOf(trace, 'MR')?.data, r = lastOf(trace, 'MW')?.data;
-    return Object.assign(info, { acc: v, tmp: 1, result: r, dest: 'mem', expr: `(${t.slice(1, -1)}) : ${hex(v)} ${s} = ${hex(r)}` });
+    return Object.assign(info, { acc: v, tmp: 1, result: r, dest: 'mem', expr: `(${t.slice(1, -1)}): ${hex(v)} ${s} = ${hex(r)}` });
   }
   if (['RLCA', 'RRCA', 'RLA', 'RRA', 'CPL', 'NEG', 'DAA', 'SCF', 'CCF'].includes(m)) {
-    return Object.assign(info, { acc: before.A, result: after.A, dest: 'A', expr: `${m} : ${hex(before.A)} → ${hex(after.A)}` });
+    return Object.assign(info, { acc: before.A, result: after.A, dest: 'A', expr: `${m}: ${hex(before.A)} → ${hex(after.A)}` });
   }
   if (['RLC', 'RRC', 'RL', 'RR', 'SLA', 'SRA', 'SLL', 'SRL', 'SET', 'RES'].includes(m)) {
     const t = ['SET', 'RES'].includes(m) ? ops[1] : ops[0];
-    if (REG8.has(t)) return Object.assign(info, { acc: before[t], result: after[t], dest: t, expr: `${m} : ${hex(before[t])} (${before[t].toString(2).padStart(8, '0')}) → ${hex(after[t])} (${after[t].toString(2).padStart(8, '0')})` });
+    if (REG8.has(t)) return Object.assign(info, { acc: before[t], result: after[t], dest: t, expr: `${m}: ${hex(before[t])} (${before[t].toString(2).padStart(8, '0')}) → ${hex(after[t])} (${after[t].toString(2).padStart(8, '0')})` });
     const v = lastOf(trace, 'MR')?.data, r = lastOf(trace, 'MW')?.data;
-    return Object.assign(info, { acc: v, result: r, dest: 'mem', expr: `${m} : ${hex(v)} → ${hex(r)}` });
+    return Object.assign(info, { acc: v, result: r, dest: 'mem', expr: `${m}: ${hex(v)} → ${hex(r)}` });
   }
   if (m === 'BIT') {
     const n = +ops[0], v = REG8.has(ops[1]) ? before[ops[1]] : lastOf(trace, 'MR')?.data;
-    return Object.assign(info, { acc: v, tmp: 1 << n, result: v & (1 << n), expr: `bit ${n} de ${hex(v)} (${v?.toString(2).padStart(8, '0')}) = ${(v >> n) & 1} → Z = ${(after.F >> 6) & 1}` });
+    return Object.assign(info, { acc: v, tmp: 1 << n, result: v & (1 << n), expr: `bit ${n} of ${hex(v)} (${v?.toString(2).padStart(8, '0')}) = ${(v >> n) & 1} → Z = ${(after.F >> 6) & 1}` });
   }
   return null;
 }
 
-/* Décodage de l'opcode en champs x (2 bits), y (3), z (3), p = y>>1, q = y&1 — schéma de Zilog */
+/* Opcode decoding into fields x (2 bits), y (3), z (3), p = y>>1, q = y&1 — Zilog scheme */
 const R = ['B', 'C', 'D', 'E', 'H', 'L', '(HL)', 'A'];
 const RP = ['BC', 'DE', 'HL', 'SP'];
 const ALU = ['ADD A,', 'ADC A,', 'SUB', 'SBC A,', 'AND', 'XOR', 'OR', 'CP'];
 const MAIN = {
-  0: ['sauts relatifs, EX AF,AF\', NOP (selon y)', 'LD rp[p],nn (q=0) / ADD HL,rp[p] (q=1)', 'chargements indirects (BC), (DE), (nn)', 'INC rp[p] (q=0) / DEC rp[p] (q=1)', 'INC r[y]', 'DEC r[y]', 'LD r[y],n', 'rotations de A et opérations sur les drapeaux'],
-  3: ['RET cc[y]', 'POP rp2[p] / RET, EXX, JP (HL), LD SP,HL', 'JP cc[y],nn', 'JP nn, préfixe CB, OUT, IN, EX, DI, EI (selon y)', 'CALL cc[y],nn', 'PUSH rp2[p] / CALL nn, préfixes DD, ED, FD', 'opération UAL alu[y] avec un octet immédiat', 'RST y×8'],
+  0: ['relative jumps, EX AF,AF\', NOP (depending on y)', 'LD rp[p],nn (q=0) / ADD HL,rp[p] (q=1)', 'indirect loads (BC), (DE), (nn)', 'INC rp[p] (q=0) / DEC rp[p] (q=1)', 'INC r[y]', 'DEC r[y]', 'LD r[y],n', 'rotates of A and flag operations'],
+  3: ['RET cc[y]', 'POP rp2[p] / RET, EXX, JP (HL), LD SP,HL', 'JP cc[y],nn', 'JP nn, CB prefix, OUT, IN, EX, DI, EI (depending on y)', 'CALL cc[y],nn', 'PUSH rp2[p] / CALL nn, DD, ED, FD prefixes', 'ALU operation alu[y] with an immediate byte', 'RST y×8'],
 };
 export function decodeInfo(d) {
   const b = d.bytes;
   if (!b || !b.length) return null;
-  let table = 'principale', op = b[0], prefix = '';
+  let table = 'main', op = b[0], prefix = '';
   if (b[0] === 0xCB) { table = 'CB'; op = b[1]; prefix = 'CB '; }
   else if (b[0] === 0xED) { table = 'ED'; op = b[1]; prefix = 'ED '; }
   else if ((b[0] === 0xDD || b[0] === 0xFD) && b.length > 1) {
     const ix = b[0] === 0xDD ? 'IX' : 'IY';
-    if (b[1] === 0xCB) { table = `CB indexée (${ix})`; op = b[3]; prefix = `${hex(b[0])} CB d `; }
-    else { table = `principale, HL → ${ix}`; op = b[1]; prefix = `${hex(b[0])} `; }
+    if (b[1] === 0xCB) { table = `CB (indexed, ${ix})`; op = b[3]; prefix = `${hex(b[0])} CB d `; }
+    else { table = `main, HL → ${ix}`; op = b[1]; prefix = `${hex(b[0])} `; }
   }
   if (op == null) return null;
   const x = op >> 6, y = (op >> 3) & 7, z = op & 7, p = y >> 1, q = y & 1;
   let role;
-  if (table.startsWith('CB')) role = [`rotation/décalage n°${y} de r[z] = ${R[z]}`, `BIT ${y},r[z] = ${R[z]}`, `RES ${y},r[z] = ${R[z]}`, `SET ${y},r[z] = ${R[z]}`][x];
-  else if (table === 'ED') role = x === 1 ? ['IN r[y],(C)', 'OUT (C),r[y]', 'SBC/ADC HL,rp[p]', 'LD (nn),rp / LD rp,(nn)', 'NEG', 'RETN / RETI', 'IM', 'LD I/R, RRD, RLD'][z] : x === 2 && z <= 3 && y >= 4 ? 'instruction de bloc (LDI, CPI, INI, OUTI… et répétitions)' : 'opcode ED non défini (NOP de 8 T)';
+  if (table.startsWith('CB')) role = [`rotate/shift no. ${y} of r[z] = ${R[z]}`, `BIT ${y},r[z] = ${R[z]}`, `RES ${y},r[z] = ${R[z]}`, `SET ${y},r[z] = ${R[z]}`][x];
+  else if (table === 'ED') role = x === 1 ? ['IN r[y],(C)', 'OUT (C),r[y]', 'SBC/ADC HL,rp[p]', 'LD (nn),rp / LD rp,(nn)', 'NEG', 'RETN / RETI', 'IM', 'LD I/R, RRD, RLD'][z] : x === 2 && z <= 3 && y >= 4 ? 'block instruction (LDI, CPI, INI, OUTI… and repeats)' : 'undefined ED opcode (8 T NOP)';
   else if (x === 1) role = y === 6 && z === 6 ? 'HALT' : `LD r[y],r[z] = LD ${R[y]},${R[z]}`;
   else if (x === 2) role = `alu[y] r[z] = ${ALU[y]} ${R[z]}`;
   else role = MAIN[x][z].replace('r[y]', `r[y] = ${R[y]}`).replace('rp[p]', `rp[p] = ${RP[p]}`).replace('alu[y]', `alu[y] = ${ALU[y].trim()}`);
@@ -117,18 +117,18 @@ export function decodeInfo(d) {
   return { table, prefix, op, x, y, z, p, q, bits: `${bits.slice(0, 2)}·${bits.slice(2, 5)}·${bits.slice(5)}`, role };
 }
 
-/* Ajoute à chaque T-state les transferts de valeurs entre blocs */
+/* Adds to each T-state the value transfers between blocks */
 export function addTransfers(steps, d, before, after, trace, alu) {
   const chg = Object.keys(after).filter(k => before[k] !== after[k] && !['R', 'PC', 'WZ', 'F'].includes(k));
   const destReg = chg.find(k => k.length <= 2 && !k.includes("'")) || null;
   steps.forEach((s, i) => {
     const T = (route, value, kind, stage = 0, label = '') => (s.transfers ||= []).push({ route, value, kind, stage, label });
     const lastCycle = s.m === steps[steps.length - 1].m;
-    if (s.mtype === 'M1' && s.title !== 'État interne') {
+    if (s.mtype === 'M1' && s.title !== 'Internal state') {
       if (s.t === 1) { T('rf-ab', hex(s.addr, 4), 'addr', 0, 'PC'); T('ab-out', hex(s.addr, 4), 'addr', 1); }
       if (s.t === 2) { T('in-db', hex(s.data), 'data', 0); T('rf-inc', hex(s.addr, 4), 'addr', 0, 'PC'); T('inc-rf', hex((s.addr + 1) & 0xFFFF, 4), 'addr', 1, 'PC+1'); }
       if (s.t === 3) { T('db-ir', hex(s.ir), 'data', 0, '→ IR'); T('rf-ab', hex(s.addr, 4), 'addr', 0, 'I·R'); }
-      if (s.t === 4) T('ir-dec', hex(steps.slice(0, i + 1).reverse().find(x => x.ir != null)?.ir ?? 0), 'ctrl', 0, 'décodage');
+      if (s.t === 4) T('ir-dec', hex(steps.slice(0, i + 1).reverse().find(x => x.ir != null)?.ir ?? 0), 'ctrl', 0, 'decode');
     } else if (s.mtype === 'MR' && s.t <= 3) {
       if (s.t === 1) { T('rf-ab', hex(s.addr, 4), 'addr', 0); T('ab-out', hex(s.addr, 4), 'addr', 1); }
       if (s.t === 2) T('in-db', hex(s.data), 'data', 0);
@@ -136,7 +136,7 @@ export function addTransfers(steps, d, before, after, trace, alu) {
         const isAluOperand = alu && lastCycle && !alu.w16 && (alu.dest === 'A' || alu.dest === null || alu.dest === 'mem');
         if (isAluOperand) T('db-tmp', hex(s.data), 'data', 0, '→ TMP');
         else if (lastCycle && destReg && !W16.has(destReg)) T('db-rf', hex(s.data), 'data', 0, `→ ${destReg}`);
-        else T('db-rf', hex(s.data), 'data', 0, before.PC <= s.addr && s.addr < before.PC + 4 ? '→ W/Z' : '→ registre');
+        else T('db-rf', hex(s.data), 'data', 0, before.PC <= s.addr && s.addr < before.PC + 4 ? '→ W/Z' : '→ register');
       }
     } else if (s.mtype === 'MW' && s.t <= 3) {
       if (s.t === 1) { T('rf-ab', hex(s.addr, 4), 'addr', 0); T('ab-out', hex(s.addr, 4), 'addr', 1); }
@@ -146,7 +146,7 @@ export function addTransfers(steps, d, before, after, trace, alu) {
       if (s.mtype === 'IOW' && s.t === 2) { T('rf-db', hex(s.data), 'data', 0); T('db-out', hex(s.data), 'data', 1); }
       if (s.mtype === 'IOR' && s.t === 4) { T('in-db', hex(s.data), 'data', 0); T('db-rf', hex(s.data), 'data', 1, destReg ? `→ ${destReg}` : ''); }
     }
-    // exécution dans l'UAL (étape où les blocs de l'UAL s'allument)
+    // execution in the ALU (step where the ALU blocks light up)
     if (alu && s.blocks.includes('b-alu') && !(s.transfers || []).some(t => t.route === 'acc-alu')) {
       const w = alu.w16 ? 4 : 2;
       if (alu.acc != null) T('rf-acc', hex(alu.acc, w), 'data', 0, '→ ACC');
@@ -155,7 +155,7 @@ export function addTransfers(steps, d, before, after, trace, alu) {
       if (alu.tmp != null) T('tmp-alu', hex(alu.tmp, w), 'data', 1);
       if (alu.result != null) T(alu.dest === 'mem' ? 'alu-db' : 'alu-rf', hex(alu.result, w), 'data', 2, alu.dest && alu.dest !== 'mem' ? `→ ${alu.dest}` : '');
       if (before.F !== after.F) T('alu-f', hex(after.F), 'ctrl', 2, '→ F');
-    } else if (s.blocks.includes('b-inc') && s.title === 'État interne' && !(s.transfers || []).length && destReg && W16.has(destReg)) {
+    } else if (s.blocks.includes('b-inc') && s.title === 'Internal state' && !(s.transfers || []).length && destReg && W16.has(destReg)) {
       T('rf-inc', hex(pair(before, destReg), 4), 'addr', 0, destReg);
       T('inc-rf', hex(pair(after, destReg), 4), 'addr', 1, destReg);
     }

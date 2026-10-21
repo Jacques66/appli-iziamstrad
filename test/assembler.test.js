@@ -5,21 +5,21 @@ import { assemble, toImage } from '../src/asm/assembler.js';
 const hexBytes = arr => [...arr].map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 const allBytes = r => r.segments.flatMap(s => [...s.bytes]);
 
-// Assemble sans erreur et renvoie les octets en hexadécimal.
+// Assembles without errors and returns the bytes in hexadecimal.
 function asm(src, options) {
   const r = assemble(src, options);
-  assert.deepEqual(r.errors, [], `erreurs inattendues pour ${JSON.stringify(src)}`);
+  assert.deepEqual(r.errors, [], `unexpected errors for ${JSON.stringify(src)}`);
   return hexBytes(allBytes(r));
 }
 
-// Messages d'erreur d'un source (avec numéros de ligne).
+// Error messages of a source (with line numbers).
 const errorsOf = (src, options) => assemble(src, options).errors;
 
 /* =====================================================================
-   Encodage, instruction par instruction (octets vérifiés à la main)
+   Encoding, instruction by instruction (bytes checked by hand)
    ===================================================================== */
 const CASES = [
-  // LD 8 bits
+  // 8-bit LD
   ['LD A,(HL)', '7E'],
   ['LD B,C', '41'],
   ['LD H,L', '65'],
@@ -37,7 +37,7 @@ const CASES = [
   ['LD A,R', 'ED 5F'],
   ['LD I,A', 'ED 47'],
   ['LD R,A', 'ED 4F'],
-  // LD indexés
+  // indexed LD
   ['LD (IX+5),3', 'DD 36 05 03'],
   ['LD (IY-2),&FF', 'FD 36 FE FF'],
   ['LD A,(IX+5)', 'DD 7E 05'],
@@ -51,7 +51,7 @@ const CASES = [
   ['LD IXH,IXL', 'DD 65'],
   ['LD HX,B', 'DD 60'],
   ['LD LY,&10', 'FD 2E 10'],
-  // LD 16 bits
+  // 16-bit LD
   ['LD BC,&1234', '01 34 12'],
   ['LD DE,&1234', '11 34 12'],
   ['LD HL,&1234', '21 34 12'],
@@ -73,7 +73,7 @@ const CASES = [
   ['LD SP,HL', 'F9'],
   ['LD SP,IX', 'DD F9'],
   ['LD SP,IY', 'FD F9'],
-  // échanges, pile
+  // exchanges, stack
   ["EX AF,AF'", '08'],
   ['EX DE,HL', 'EB'],
   ['EX (SP),HL', 'E3'],
@@ -86,7 +86,7 @@ const CASES = [
   ['POP DE', 'D1'],
   ['PUSH IX', 'DD E5'],
   ['POP IY', 'FD E1'],
-  // UAL 8 bits
+  // 8-bit ALU
   ['ADD A,B', '80'],
   ['ADD A,(HL)', '86'],
   ['ADD A,5', 'C6 05'],
@@ -128,7 +128,7 @@ const CASES = [
   ['DEC HL', '2B'],
   ['INC IX', 'DD 23'],
   ['DEC IY', 'FD 2B'],
-  // UAL 16 bits
+  // 16-bit ALU
   ['ADD HL,BC', '09'],
   ['ADD HL,HL', '29'],
   ['ADD HL,SP', '39'],
@@ -140,7 +140,7 @@ const CASES = [
   ['ADC HL,HL', 'ED 6A'],
   ['SBC HL,BC', 'ED 42'],
   ['SBC HL,SP', 'ED 72'],
-  // rotations et décalages CB
+  // CB rotations and shifts
   ['RLC B', 'CB 00'],
   ['RRC C', 'CB 09'],
   ['RL D', 'CB 12'],
@@ -164,7 +164,7 @@ const CASES = [
   ['SET 1,(IX+0),A', 'DD CB 00 CF'],
   ['RES 7,(IX+4)', 'DD CB 04 BE'],
   ['RES 2,(IY+1),C', 'FD CB 01 91'],
-  // sauts absolus, appels, retours
+  // absolute jumps, calls, returns
   ['JP &1234', 'C3 34 12'],
   ['JP NZ,&1234', 'C2 34 12'],
   ['JP Z,&1234', 'CA 34 12'],
@@ -194,13 +194,13 @@ const CASES = [
   ['RST &38', 'FF'],
   ['RST 38h', 'FF'],
   ['RST 7', 'FF'],
-  // sauts relatifs (origine 0)
+  // relative jumps (origin 0)
   ['JR $', '18 FE'],
   ['JR Z,$', '28 FE'],
   ['JR NC,$+2', '30 00'],
   ['JR C,$+129', '38 7F'],
   ['DJNZ $', '10 FE'],
-  // modes d'interruption, divers
+  // interrupt modes, miscellaneous
   ['IM 0', 'ED 46'],
   ['IM 1', 'ED 56'],
   ['IM 2', 'ED 5E'],
@@ -219,7 +219,7 @@ const CASES = [
   ['RRA', '1F'],
   ['RLD', 'ED 6F'],
   ['RRD', 'ED 67'],
-  // instructions de bloc
+  // block instructions
   ['LDI', 'ED A0'],
   ['LDIR', 'ED B0'],
   ['LDD', 'ED A8'],
@@ -236,7 +236,7 @@ const CASES = [
   ['OTIR', 'ED B3'],
   ['OUTD', 'ED AB'],
   ['OTDR', 'ED BB'],
-  // entrées / sorties
+  // input / output
   ['IN A,(&FE)', 'DB FE'],
   ['IN B,(C)', 'ED 40'],
   ['IN A,(C)', 'ED 78'],
@@ -248,13 +248,13 @@ const CASES = [
   ['OUT (C),0', 'ED 71'],
 ];
 
-describe('encodage des instructions', () => {
+describe('instruction encoding', () => {
   for (const [src, expected] of CASES) {
     test(src, () => assert.equal(asm('  ' + src), expected));
   }
 });
 
-test('mnémoniques et registres insensibles à la casse', () => {
+test('mnemonics and registers are case-insensitive', () => {
   assert.equal(asm(' ld a,(hl)'), '7E');
   assert.equal(asm(" ex af,af'"), '08');
   assert.equal(asm(' Bit 7,(iy-1)'), 'FD CB FF 7E');
@@ -262,9 +262,9 @@ test('mnémoniques et registres insensibles à la casse', () => {
 });
 
 /* =====================================================================
-   Combinaisons refusées
+   Rejected combinations
    ===================================================================== */
-describe('opérandes invalides', () => {
+describe('invalid operands', () => {
   const invalid = [
     'LD (HL),(DE)', 'LD IXH,(IX+1)', 'LD IXH,H', 'LD H,IXL', 'LD IXH,IYL', 'LD IXL,(HL)',
     'LD (IX+1),IXH', 'LD (HL),(HL)', 'LD (IX+1),(HL)', 'LD A,(C)', 'LD BC,DE', 'LD I,B',
@@ -278,41 +278,41 @@ describe('opérandes invalides', () => {
       const r = assemble('  ' + src);
       assert.equal(r.ok, false);
       assert.equal(r.errors.length, 1);
-      assert.match(r.errors[0].message, /^opérande invalide pour /);
+      assert.match(r.errors[0].message, /^invalid operand for /);
     });
   }
 
-  test('message précis', () => {
-    assert.deepEqual(errorsOf(' LD (HL),(DE)'), [{ line: 1, message: 'opérande invalide pour LD : (HL),(DE)' }]);
-    assert.deepEqual(errorsOf(' LD'), [{ line: 1, message: 'opérande manquant pour LD' }]);
+  test('precise message', () => {
+    assert.deepEqual(errorsOf(' LD (HL),(DE)'), [{ line: 1, message: 'invalid operand for LD: (HL),(DE)' }]);
+    assert.deepEqual(errorsOf(' LD'), [{ line: 1, message: 'missing operand for LD' }]);
   });
 
-  test('JR refuse les conditions PO PE P M', () => {
-    assert.deepEqual(errorsOf(' JR PO,0'), [{ line: 1, message: 'condition non permise avec JR : PO' }]);
+  test('JR rejects the conditions PO PE P M', () => {
+    assert.deepEqual(errorsOf(' JR PO,0'), [{ line: 1, message: 'condition not allowed with JR: PO' }]);
   });
 
-  test('valeurs hors domaine', () => {
-    assert.match(errorsOf(' RST 3+&10')[0].message, /RST invalide : &13/);
-    assert.match(errorsOf(' IM 3')[0].message, /mode d'interruption invalide : 3/);
-    assert.match(errorsOf(' BIT 8,A')[0].message, /numéro de bit invalide : 8/);
+  test('out-of-domain values', () => {
+    assert.match(errorsOf(' RST 3+&10')[0].message, /invalid RST address: &13/);
+    assert.match(errorsOf(' IM 3')[0].message, /invalid interrupt mode: 3/);
+    assert.match(errorsOf(' BIT 8,A')[0].message, /invalid bit number: 8/);
     assert.match(errorsOf(' OUT (C),1')[0].message, /OUT \(C\),n/);
   });
 });
 
 /* =====================================================================
-   Nombres et expressions
+   Numbers and expressions
    ===================================================================== */
-describe('nombres', () => {
+describe('numbers', () => {
   const forms = ['255', '&FF', '#FF', '$FF', '0xFF', '0FFh', '0ffH', '%11111111', '0b11111111', '11111111b'];
   for (const f of forms) {
     test(f, () => assert.equal(asm(` DB ${f}`), 'FF'));
   }
-  test('caractères', () => {
+  test('characters', () => {
     assert.equal(asm(" DB 'A',\"B\",'A'+1"), '41 42 42');
     assert.equal(asm(" LD A,';'"), '3E 3B');
   });
-  test('nombre invalide', () => {
-    assert.deepEqual(errorsOf(' DB 12G'), [{ line: 1, message: 'nombre invalide : 12G' }]);
+  test('invalid number', () => {
+    assert.deepEqual(errorsOf(' DB 12G'), [{ line: 1, message: 'invalid number: 12G' }]);
   });
 });
 
@@ -322,7 +322,7 @@ describe('expressions', () => {
     assert.deepEqual(r.errors, []);
     return r.symbols.X;
   };
-  test('priorités usuelles', () => {
+  test('usual precedence', () => {
     assert.equal(value('2+3*4'), 14);
     assert.equal(value('(2+3)*4'), 20);
     assert.equal(value('10-4-3'), 3);
@@ -342,10 +342,10 @@ describe('expressions', () => {
     assert.equal(value('5 % 3'), 2);
     assert.equal(value('%101 % 3'), 2);
   });
-  test('division par zéro', () => {
-    assert.match(errorsOf('X EQU 1/0')[0].message, /division par zéro/);
+  test('division by zero', () => {
+    assert.match(errorsOf('X EQU 1/0')[0].message, /division by zero/);
   });
-  test('parenthèses : indirection seulement si elles englobent tout l\'opérande', () => {
+  test('parentheses: indirection only if they enclose the whole operand', () => {
     assert.equal(asm(' LD A,(1+2)*3'), '3E 09');
     assert.equal(asm(' LD A,(1+2)'), '3A 03 00');
     assert.equal(asm(' LD HL,(2)+(3)'), '21 05 00');
@@ -353,95 +353,95 @@ describe('expressions', () => {
     assert.equal(asm('v EQU &10\n LD A,(v+1)'), '3A 11 00');
     assert.equal(asm(' LD (IX+2*3-1),A'), 'DD 77 05');
   });
-  test('$ = adresse de l\'instruction courante', () => {
+  test('$ = address of the current instruction', () => {
     assert.equal(asm(' ORG &4000\n DW $,$+2\n JP $'), '00 40 02 40 C3 04 40');
   });
 });
 
 /* =====================================================================
-   Labels, symboles, directives
+   Labels, symbols, directives
    ===================================================================== */
-describe('labels et symboles', () => {
-  test('label en colonne 0 sans deux-points, label indenté avec deux-points', () => {
-    const r = assemble('debut LD A,1\n   ici: NOP\nfin:');
+describe('labels and symbols', () => {
+  test('label in column 0 without colon, indented label with colon', () => {
+    const r = assemble('start LD A,1\n   here: NOP\ndone:');
     assert.deepEqual(r.errors, []);
-    assert.deepEqual(r.symbols, { DEBUT: 0, ICI: 2, FIN: 3 });
+    assert.deepEqual(r.symbols, { START: 0, HERE: 2, DONE: 3 });
   });
-  test('mnémonique en colonne 0 sans label', () => {
+  test('mnemonic in column 0 without label', () => {
     assert.equal(asm('LD A,5\nNOP\nDB 1'), '3E 05 00 01');
   });
-  test('EQU, = et symboles en majuscules', () => {
-    const r = assemble('Ecran EQU &C000\n  taille = 16*1024\nfin: equ Ecran+taille-1');
+  test('EQU, = and upper-case symbols', () => {
+    const r = assemble('Screen EQU &C000\n  size = 16*1024\ndone: equ Screen+size-1');
     assert.deepEqual(r.errors, []);
-    assert.deepEqual(r.symbols, { ECRAN: 0xC000, TAILLE: 16384, FIN: 0xFFFF });
+    assert.deepEqual(r.symbols, { SCREEN: 0xC000, SIZE: 16384, DONE: 0xFFFF });
   });
-  test('références en avant', () => {
-    assert.equal(asm(' JP fin\n JR fin\n LD HL,data\nfin: RET\ndata: DB 1'), 'C3 08 00 18 03 21 09 00 C9 01');
+  test('forward references', () => {
+    assert.equal(asm(' JP done\n JR done\n LD HL,data\ndone: RET\ndata: DB 1'), 'C3 08 00 18 03 21 09 00 C9 01');
   });
-  test('EQU qui dépend d\'un symbole défini plus loin', () => {
+  test('EQU depending on a symbol defined later', () => {
     const r = assemble('A1 EQU B1+1\n LD A,A1\nB1 EQU 5');
     assert.deepEqual(r.errors, []);
     assert.equal(hexBytes(allBytes(r)), '3E 06');
   });
-  test('ORG dépendant d\'une référence en avant', () => {
+  test('ORG depending on a forward reference', () => {
     const r = assemble(' ORG base\n NOP\nbase EQU &8000');
     assert.deepEqual(r.errors, []);
     assert.equal(r.segments[0].start, 0x8000);
   });
-  test('labels commençant par un point ou un souligné', () => {
-    const r = assemble('.boucle: DJNZ .boucle\n_x: JR _x');
+  test('labels starting with a dot or an underscore', () => {
+    const r = assemble('.loop: DJNZ .loop\n_x: JR _x');
     assert.deepEqual(r.errors, []);
-    assert.deepEqual(r.symbols, { '.BOUCLE': 0, _X: 2 });
+    assert.deepEqual(r.symbols, { '.LOOP': 0, _X: 2 });
   });
-  test('nom réservé', () => {
-    assert.match(errorsOf('HL: NOP')[0].message, /nom réservé/);
+  test('reserved name', () => {
+    assert.match(errorsOf('HL: NOP')[0].message, /reserved name/);
   });
 });
 
 describe('directives', () => {
-  test('DB avec chaînes et expressions', () => {
+  test('DB with strings and expressions', () => {
     assert.equal(asm(' DB "AB",0,\'c\',"x;y",1+2'), '41 42 00 63 78 3B 79 03');
     assert.equal(asm(' DEFM "Hi"\n DM "!"\n DEFB 1'), '48 69 21 01');
   });
-  test('DB : valeur négative et avertissement de débordement', () => {
+  test('DB: negative value and overflow warning', () => {
     const r = assemble(' DB -1,300');
     assert.equal(r.ok, true);
     assert.equal(hexBytes(allBytes(r)), 'FF 2C');
     assert.equal(r.warnings.length, 1);
     assert.equal(r.warnings[0].line, 1);
-    assert.match(r.warnings[0].message, /octet : 300/);
+    assert.match(r.warnings[0].message, /byte: 300/);
   });
   test('DW / DEFW', () => {
     assert.equal(asm(' DW &1234,5\n DEFW -1'), '34 12 05 00 FF FF');
   });
   test('DS / DEFS', () => {
     assert.equal(asm(' DS 3\n DEFS 2,&AA\n NOP'), '00 00 00 AA AA 00');
-    const r = assemble(' ORG &100\n DS 4\nici:');
-    assert.equal(r.symbols.ICI, 0x104);
+    const r = assemble(' ORG &100\n DS 4\nhere:');
+    assert.equal(r.symbols.HERE, 0x104);
   });
   test('ALIGN', () => {
-    const r = assemble(' ORG &4001\n DB 1\n ALIGN 4\nici: NOP\n ALIGN 4,&FF\n ALIGN 4\n NOP');
+    const r = assemble(' ORG &4001\n DB 1\n ALIGN 4\nhere: NOP\n ALIGN 4,&FF\n ALIGN 4\n NOP');
     assert.deepEqual(r.errors, []);
-    assert.equal(r.symbols.ICI, 0x4004);
+    assert.equal(r.symbols.HERE, 0x4004);
     assert.equal(hexBytes(allBytes(r)), '01 00 00 00 FF FF FF 00');
   });
-  test('ORG multiples : segments séparés dans l\'ordre d\'émission', () => {
+  test('multiple ORGs: separate segments in emission order', () => {
     const r = assemble(' ORG &8000\n NOP\n NOP\n ORG &4000\n RET\n ORG &8002\n HALT');
     assert.deepEqual(r.segments.map(s => [s.start, hexBytes(s.bytes)]), [[0x8000, '00 00'], [0x4000, 'C9'], [0x8002, '76']]);
   });
   test('options.origin', () => {
-    const r = assemble('ici: JR ici', { origin: 0x9000 });
-    assert.equal(r.symbols.ICI, 0x9000);
+    const r = assemble('here: JR here', { origin: 0x9000 });
+    assert.equal(r.symbols.HERE, 0x9000);
     assert.equal(r.segments[0].start, 0x9000);
   });
-  test('END avec adresse : entry', () => {
-    const r = assemble(' ORG &4000\n NOP\ngo: RET\n END go\n ceci est ignoré');
+  test('END with an address: entry', () => {
+    const r = assemble(' ORG &4000\n NOP\ngo: RET\n END go\n this is ignored');
     assert.deepEqual(r.errors, []);
     assert.equal(r.entry, 0x4001);
     assert.equal(r.listing[4].addr, null);
     assert.deepEqual(r.listing[4].bytes, []);
   });
-  test('entry par défaut : premier octet émis, sinon null', () => {
+  test('default entry: first byte emitted, otherwise null', () => {
     assert.equal(assemble(' ORG &5000\n NOP').entry, 0x5000);
     assert.equal(assemble('X EQU 1').entry, null);
     assert.equal(assemble('').entry, null);
@@ -455,82 +455,82 @@ describe('directives', () => {
     assert.equal(r.listing[3].addr, 0x4002);
     assert.deepEqual(r.listing[3].bytes, [0xCD, 0x38, 0xBC, 0xC9]);
   });
-  test('INCLUDE : erreur dans le fichier inclus rapportée sur la ligne INCLUDE', () => {
+  test('INCLUDE: error in the included file reported on the INCLUDE line', () => {
     const r = assemble(' NOP\n INCLUDE "a.asm"', { include: () => ' NOP\n LD A,FOO' });
-    assert.deepEqual(r.errors, [{ line: 2, message: 'a.asm, ligne 2 : symbole inconnu : FOO' }]);
+    assert.deepEqual(r.errors, [{ line: 2, message: 'a.asm, line 2: unknown symbol: FOO' }]);
   });
-  test('INCLUDE sans options.include', () => {
+  test('INCLUDE without options.include', () => {
     const r = assemble(' INCLUDE "x.asm"');
     assert.equal(r.ok, false);
-    assert.match(r.errors[0].message, /INCLUDE impossible/);
+    assert.match(r.errors[0].message, /INCLUDE failed/);
   });
 });
 
 /* =====================================================================
-   Erreurs
+   Errors
    ===================================================================== */
-describe('erreurs', () => {
-  test('symbole inconnu avec numéro de ligne', () => {
-    assert.deepEqual(errorsOf(' NOP\n\n LD A,FOO'), [{ line: 3, message: 'symbole inconnu : FOO' }]);
+describe('errors', () => {
+  test('unknown symbol with line number', () => {
+    assert.deepEqual(errorsOf(' NOP\n\n LD A,FOO'), [{ line: 3, message: 'unknown symbol: FOO' }]);
   });
-  test('JR hors de portée', () => {
-    assert.deepEqual(errorsOf('debut: DS 128\n JR debut'), [{ line: 2, message: 'saut relatif hors de portée (-130)' }]);
-    assert.deepEqual(errorsOf(' JR fin\n DS 128\nfin:'), [{ line: 1, message: 'saut relatif hors de portée (128)' }]);
-    assert.equal(asm(' JR fin\n DS 127\nfin:').slice(0, 5), '18 7F');
+  test('JR out of range', () => {
+    assert.deepEqual(errorsOf('back: DS 128\n JR back'), [{ line: 2, message: 'relative jump out of range (-130)' }]);
+    assert.deepEqual(errorsOf(' JR done\n DS 128\ndone:'), [{ line: 1, message: 'relative jump out of range (128)' }]);
+    assert.equal(asm(' JR done\n DS 127\ndone:').slice(0, 5), '18 7F');
   });
-  test('JR vers un symbole inconnu : une seule erreur', () => {
-    assert.deepEqual(errorsOf(' JR nulle_part'), [{ line: 1, message: 'symbole inconnu : NULLE_PART' }]);
+  test('JR to an unknown symbol: a single error', () => {
+    assert.deepEqual(errorsOf(' JR nowhere'), [{ line: 1, message: 'unknown symbol: NOWHERE' }]);
   });
-  test('doublon de label', () => {
-    assert.deepEqual(errorsOf('x: NOP\ny: NOP\nX: NOP'), [{ line: 3, message: 'symbole déjà défini : X' }]);
+  test('duplicate label', () => {
+    assert.deepEqual(errorsOf('x: NOP\ny: NOP\nX: NOP'), [{ line: 3, message: 'symbol already defined: X' }]);
   });
-  test('déplacement d\'index hors limites', () => {
-    assert.deepEqual(errorsOf(' LD A,(IX+128)'), [{ line: 1, message: 'déplacement hors limites (128)' }]);
-    assert.deepEqual(errorsOf(' LD A,(IY-129)'), [{ line: 1, message: 'déplacement hors limites (-129)' }]);
+  test('index displacement out of range', () => {
+    assert.deepEqual(errorsOf(' LD A,(IX+128)'), [{ line: 1, message: 'displacement out of range (128)' }]);
+    assert.deepEqual(errorsOf(' LD A,(IY-129)'), [{ line: 1, message: 'displacement out of range (-129)' }]);
     assert.equal(asm(' LD A,(IX-128)\n LD A,(IX+127)'), 'DD 7E 80 DD 7E 7F');
   });
-  test('instruction inconnue', () => {
-    assert.deepEqual(errorsOf(' FOO A'), [{ line: 1, message: 'instruction inconnue : FOO' }]);
+  test('unknown instruction', () => {
+    assert.deepEqual(errorsOf(' FOO A'), [{ line: 1, message: 'unknown instruction: FOO' }]);
   });
-  test('plusieurs erreurs signalées, chacune sur sa ligne', () => {
+  test('several errors reported, each on its own line', () => {
     const r = assemble(' LD A,FOO\n NOP\n LD (HL),(DE)\nx: NOP\nx: NOP\n BLA\n JR $+200\n DB "abc');
     assert.deepEqual(r.errors.map(e => e.line), [1, 3, 5, 6, 7, 8]);
     assert.equal(r.ok, false);
-    // les lignes correctes sont quand même assemblées
+    // the correct lines are still assembled
     assert.deepEqual(r.listing[1].bytes, [0x00]);
   });
-  test('avertissement octet, pas erreur', () => {
+  test('byte warning, not an error', () => {
     const r = assemble(' LD A,256');
     assert.equal(r.ok, true);
     assert.equal(r.warnings.length, 1);
     assert.equal(hexBytes(allBytes(r)), '3E 00');
   });
-  test('registre dans une expression', () => {
-    assert.match(errorsOf(' LD A,(HL+1)')[0].message, /registre inattendu/);
+  test('register in an expression', () => {
+    assert.match(errorsOf(' LD A,(HL+1)')[0].message, /unexpected register/);
   });
-  test('dépassement de &FFFF', () => {
+  test('going past &FFFF', () => {
     const r = assemble(' ORG &FFFF\n LD HL,0');
     assert.equal(r.ok, false);
-    assert.match(r.errors[0].message, /dépasse/);
+    assert.match(r.errors[0].message, /goes past/);
   });
 });
 
 /* =====================================================================
-   Listing, image mémoire
+   Listing, memory image
    ===================================================================== */
 describe('listing', () => {
-  test('une entrée par ligne source', () => {
-    const src = '; commentaire\n ORG &4000\ndebut: LD A,1 ; charge\n\nfin:\n DB 1,2';
+  test('one entry per source line', () => {
+    const src = '; comment\n ORG &4000\nstart: LD A,1 ; load\n\ndone:\n DB 1,2';
     const r = assemble(src);
     assert.equal(r.listing.length, 6);
     assert.deepEqual(r.listing.map(l => l.line), [1, 2, 3, 4, 5, 6]);
-    assert.deepEqual(r.listing[0], { line: 1, addr: null, bytes: [], source: '; commentaire' });
-    assert.deepEqual(r.listing[2], { line: 3, addr: 0x4000, bytes: [0x3E, 0x01], source: 'debut: LD A,1 ; charge' });
+    assert.deepEqual(r.listing[0], { line: 1, addr: null, bytes: [], source: '; comment' });
+    assert.deepEqual(r.listing[2], { line: 3, addr: 0x4000, bytes: [0x3E, 0x01], source: 'start: LD A,1 ; load' });
     assert.equal(r.listing[3].addr, null);
     assert.equal(r.listing[4].addr, 0x4002);
     assert.deepEqual(r.listing[5].bytes, [1, 2]);
   });
-  test('fins de ligne CRLF', () => {
+  test('CRLF line endings', () => {
     const r = assemble(' NOP\r\n HALT\r\n');
     assert.deepEqual(r.errors, []);
     assert.equal(r.listing[1].source, ' HALT');
@@ -549,9 +549,9 @@ test('toImage', () => {
 });
 
 /* =====================================================================
-   Format du désassembleur
+   Disassembler format
    ===================================================================== */
-test('accepte le format produit par le désassembleur', () => {
+test('accepts the format produced by the disassembler', () => {
   const src = [
     'LD (IX+&05),&03',
     'LD A,(IX-&01)',
@@ -572,33 +572,33 @@ test('accepte le format produit par le désassembleur', () => {
 });
 
 /* =====================================================================
-   Programme de démonstration
+   Demo program
    ===================================================================== */
-test('programme bonjour.asm : 41 octets', () => {
+test('demo program hello.asm: 41 bytes', () => {
   const src = `TXT_OUTPUT      EQU  &BB5A
 SCR_SET_BORDER  EQU  &BC38
                 ORG  &4000
 start:          LD   HL,message
-boucle:         LD   A,(HL)
+loop:           LD   A,(HL)
                 OR   A
-                JR   Z,bordure
+                JR   Z,border
                 CALL TXT_OUTPUT
                 INC  HL
-                JR   boucle
-bordure:        LD   B,6
+                JR   loop
+border:         LD   B,6
                 LD   C,B
                 CALL SCR_SET_BORDER
                 LD   A,7
                 CALL TXT_OUTPUT
                 RET
-message:        DB   "Bonjour Z80 !",13,10,0
+message:        DB   "Hello, world!",13,10,0
                 END  start`;
   const r = assemble(src);
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.warnings, []);
   assert.equal(r.segments.length, 1);
   assert.equal(r.segments[0].start, 0x4000);
-  const ascii = [...'Bonjour Z80 !'].map(c => c.charCodeAt(0));
+  const ascii = [...'Hello, world!'].map(c => c.charCodeAt(0));
   const expected = [
     0x21, 0x19, 0x40, 0x7E, 0xB7, 0x28, 0x06, 0xCD, 0x5A, 0xBB, 0x23, 0x18, 0xF6,
     0x06, 0x06, 0x48, 0xCD, 0x38, 0xBC, 0x3E, 0x07, 0xCD, 0x5A, 0xBB, 0xC9,
@@ -609,8 +609,8 @@ message:        DB   "Bonjour Z80 !",13,10,0
   assert.equal(r.entry, 0x4000);
   assert.deepEqual(r.symbols, {
     TXT_OUTPUT: 0xBB5A, SCR_SET_BORDER: 0xBC38, START: 0x4000,
-    BOUCLE: 0x4003, BORDURE: 0x400D, MESSAGE: 0x4019,
+    LOOP: 0x4003, BORDER: 0x400D, MESSAGE: 0x4019,
   });
   assert.equal(r.listing.length, 18);
-  assert.deepEqual(r.listing[6], { line: 7, addr: 0x4005, bytes: [0x28, 0x06], source: '                JR   Z,bordure' });
+  assert.deepEqual(r.listing[6], { line: 7, addr: 0x4005, bytes: [0x28, 0x06], source: '                JR   Z,border' });
 });

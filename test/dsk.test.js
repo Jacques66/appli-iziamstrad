@@ -4,7 +4,7 @@ import { parseDSK, writeDSK, blankDisk } from '../src/machines/cpc/dsk.js';
 
 const text = b => String.fromCharCode(...b);
 
-test('blankDisk : format données, 40 pistes, secteurs &C1–&C9 de 512 octets remplis de &E5', () => {
+test('blankDisk: data format, 40 tracks, 512-byte sectors &C1–&C9 filled with &E5', () => {
   const disk = blankDisk();
   assert.equal(disk.sides, 1);
   assert.equal(disk.dirty, false);
@@ -19,10 +19,10 @@ test('blankDisk : format données, 40 pistes, secteurs &C1–&C9 de 512 octets r
     assert.ok(s.data.every(x => x === 0xE5));
   }
   assert.deepEqual(blankDisk('system').tracks[0][0].sectors.map(s => s.R).sort(), [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49]);
-  assert.throws(() => blankDisk('ibm'), /Format de disque inconnu/);
+  assert.throws(() => blankDisk('ibm'), /Unknown disk format/);
 });
 
-test('aller-retour blankDisk → writeDSK → parseDSK au format étendu', () => {
+test('round trip blankDisk → writeDSK → parseDSK in extended format', () => {
   const disk = blankDisk('system');
   disk.tracks[0][3].sectors[2].data.fill(0x42);
   disk.tracks[0][3].sectors[4].st2 = 0x40;
@@ -55,7 +55,7 @@ test('aller-retour blankDisk → writeDSK → parseDSK au format étendu', () =>
   assert.deepEqual(writeDSK(back), bytes);
 });
 
-test('format étendu : pistes absentes, secteurs de tailles variables, deux faces', () => {
+test('extended format: missing tracks, variable-size sectors, two sides', () => {
   const sec = (R, data) => ({ C: 0, H: 0, R, N: 2, st1: 0, st2: 0, data });
   const disk = {
     sides: 2, creator: 'Test', dirty: false,
@@ -79,7 +79,7 @@ test('format étendu : pistes absentes, secteurs de tailles variables, deux face
   assert.equal(back.tracks[0][0].filler, 0xAA);
 });
 
-// DSK standard : 2 pistes, 1 face, 2 secteurs de 256 octets (N=1) par piste
+// standard DSK: 2 tracks, 1 side, 2 sectors of 256 bytes (N=1) per track
 function buildStandard() {
   const trackSize = 0x100 + 2 * 256;
   const b = new Uint8Array(0x100 + 2 * trackSize);
@@ -103,7 +103,7 @@ function buildStandard() {
   return b;
 }
 
-test('parseDSK : format standard construit à la main', () => {
+test('parseDSK: hand-built standard format', () => {
   const disk = parseDSK(buildStandard());
   assert.equal(disk.sides, 1);
   assert.equal(disk.creator, 'CPCEMU');
@@ -114,23 +114,23 @@ test('parseDSK : format standard construit à la main', () => {
   assert.deepEqual(t1.sectors.map(s => [s.C, s.H, s.R, s.N, s.st2]), [[1, 0, 1, 1, 0], [1, 0, 2, 1, 0x40]]);
   assert.equal(t1.sectors[1].data.length, 256);
   assert.ok(t1.sectors[1].data.every(x => x === 0x11));
-  // Réécrit au format étendu, contenu identique
+  // Rewritten in extended format, identical content
   const ext = parseDSK(writeDSK(disk));
   assert.deepEqual(ext.tracks[0][1].sectors[1].data, t1.sectors[1].data);
 });
 
-test('parseDSK : erreurs sur fichier invalide', () => {
-  assert.throws(() => parseDSK(new Uint8Array(10)), /trop court|256/);
+test('parseDSK: errors on an invalid file', () => {
+  assert.throws(() => parseDSK(new Uint8Array(10)), /too short|256/);
   assert.throws(() => parseDSK(new Uint8Array(512)), /signature/);
   const truncated = buildStandard().subarray(0, 0x100 + 0x200);
-  assert.throws(() => parseDSK(truncated), /tronqué/);
+  assert.throws(() => parseDSK(truncated), /Truncated/);
   const badTrack = buildStandard();
   badTrack[0x100] = 0x58;
   assert.throws(() => parseDSK(badTrack), /Track-Info/);
   const badSides = buildStandard();
   badSides[0x31] = 3;
-  assert.throws(() => parseDSK(badSides), /faces/);
+  assert.throws(() => parseDSK(badSides), /sides/);
   const bigSector = writeDSK(blankDisk());
   bigSector[0x100 + 0x18 + 6] = 0xFF; bigSector[0x100 + 0x18 + 7] = 0xFF;
-  assert.throws(() => parseDSK(bigSector), /hors de la piste/);
+  assert.throws(() => parseDSK(bigSector), /outside the track/);
 });

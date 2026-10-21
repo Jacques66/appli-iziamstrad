@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Z80 Studio — maquette</title>
+<title>Z80 Studio — mockup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -14,82 +14,82 @@
 <header class="toolbar">
   <div class="brand"><span class="logo">Z80</span>Studio</div>
   <nav class="menus">
-    <span>Fichier</span><span>Édition</span><span>Assembler</span><span>Exécuter</span><span>Machine</span><span>Affichage</span><span>Aide</span>
+    <span>File</span><span>Edit</span><span>Assemble</span><span>Run</span><span>Machine</span><span>View</span><span>Help</span>
   </nav>
   <div class="tb-group">
-    <button class="tb" title="Assembler (F7)">⚙ Assembler</button>
-    <button class="tb run" title="Exécuter (F5)">▶ Exécuter</button>
+    <button class="tb" title="Assemble (F7)">⚙ Assemble</button>
+    <button class="tb run" title="Run (F5)">▶ Run</button>
     <button class="tb" title="Pause (F6)">❚❚</button>
-    <button class="tb" id="tb-instr" title="Pas à pas : une instruction (F10)">↷ Instruction</button>
-    <button class="tb" id="tb-tstate" title="Pas à pas : un T-state (F11)">⏱ T-state</button>
-    <button class="tb" title="Reset matériel">⟲ Reset</button>
+    <button class="tb" id="tb-instr" title="Step: one instruction (F10)">↷ Instruction</button>
+    <button class="tb" id="tb-tstate" title="Step: one T-state (F11)">⏱ T-state</button>
+    <button class="tb" title="Hardware reset">⟲ Reset</button>
   </div>
   <div class="tb-group">
-    <label title="Machine simulée">
+    <label title="Simulated machine">
       <select id="machine">
         <option value="cpc">Amstrad CPC 6128</option>
-        <option value="min">Z80 minimal (ROM · RAM · LED)</option>
+        <option value="min">Minimal Z80 (ROM · RAM · LEDs)</option>
       </select>
     </label>
-    <label title="Vitesse d'exécution">
+    <label title="Execution speed">
       <select>
-        <option>4 MHz (temps réel)</option>
+        <option>4 MHz (real time)</option>
         <option>1 kHz</option>
         <option>10 Hz (animation)</option>
-        <option>Manuelle</option>
+        <option>Manual</option>
       </select>
     </label>
   </div>
-  <div class="badge" title="Maquette : données fictives">MAQUETTE</div>
+  <div class="badge" title="Mockup: fake data">MOCKUP</div>
 </header>
 
 <div class="layout">
 
-  <!-- ============ Colonne gauche ============ -->
+  <!-- ============ Left column ============ -->
   <aside class="sidebar">
-    <div class="ph">Projet · bonjour</div>
+    <div class="ph">Project · hello</div>
     <ul class="files">
-      <li class="active"><span class="fi asm">ASM</span>bonjour.asm</li>
+      <li class="active"><span class="fi asm">ASM</span>hello.asm</li>
       <li><span class="fi inc">INC</span>firmware.inc</li>
-      <li><span class="fi bin">BIN</span>bonjour.bin <em>41 o</em></li>
+      <li><span class="fi bin">BIN</span>hello.bin <em>41 B</em></li>
       <li><span class="fi dsk">DSK</span>demo.dsk <em>A:</em></li>
-      <li><span class="fi prn">PRN</span>imprimante.txt</li>
+      <li><span class="fi prn">PRN</span>printer.txt</li>
     </ul>
-    <div class="ph">Symboles</div>
+    <div class="ph">Symbols</div>
     <table class="symbols" id="symbols"></table>
     <div class="ph">Configuration</div>
     <dl class="config" id="config"></dl>
   </aside>
 
-  <!-- ============ Zone centrale ============ -->
+  <!-- ============ Central area ============ -->
   <main class="workspace">
     <div class="tabs" data-tabs="ws">
-      <button class="tab active" data-tab="editor">Éditeur</button>
-      <button class="tab" data-tab="cpu">CPU Z80 · intérieur</button>
-      <button class="tab" data-tab="board">Carte mère</button>
-      <button class="tab" data-tab="machine">Machine · écran &amp; périphériques</button>
+      <button class="tab active" data-tab="editor">Editor</button>
+      <button class="tab" data-tab="cpu">Z80 CPU · inside</button>
+      <button class="tab" data-tab="board">Motherboard</button>
+      <button class="tab" data-tab="machine">Machine · screen &amp; peripherals</button>
     </div>
 
-    <!-- Éditeur -->
+    <!-- Editor -->
     <section class="pane active" data-group="ws" data-name="editor">
       <div class="filetabs">
-        <span class="ft active">bonjour.asm <b>●</b></span><span class="ft">firmware.inc</span>
-        <span class="ft-info">Syntaxe Maxam / WinAPE · &amp;hex, #hex, $hex</span>
+        <span class="ft active">hello.asm <b>●</b></span><span class="ft">firmware.inc</span>
+        <span class="ft-info">Maxam / WinAPE syntax · &amp;hex, #hex, $hex</span>
       </div>
       <div class="code" id="code"></div>
-      <div class="hint" id="hint">Survolez une instruction pour voir son opcode, sa durée et les drapeaux affectés.</div>
+      <div class="hint" id="hint">Hover over an instruction to see its opcode, its duration and the flags it affects.</div>
     </section>
 
-    <!-- CPU intérieur -->
+    <!-- CPU inside -->
     <section class="pane" data-group="ws" data-name="cpu">
       <div class="cpu-tools">
-        <button class="tb" id="cpu-first" title="Début">⏮</button>
-        <button class="tb" id="cpu-prev" title="T-state précédent">◀ T</button>
-        <button class="tb" id="cpu-next" title="T-state suivant">T ▶</button>
-        <button class="tb" id="cpu-play" title="Animation automatique">▶ Animer</button>
+        <button class="tb" id="cpu-first" title="Start">⏮</button>
+        <button class="tb" id="cpu-prev" title="Previous T-state">◀ T</button>
+        <button class="tb" id="cpu-next" title="Next T-state">T ▶</button>
+        <button class="tb" id="cpu-play" title="Automatic animation">▶ Animate</button>
         <span class="cpu-instr" id="cpu-instr"></span>
         <span class="legend">
-          <i class="lg addr"></i>adresses <i class="lg data"></i>données <i class="lg ctrl"></i>commande <i class="lg act"></i>actif à ce T-state
+          <i class="lg addr"></i>address <i class="lg data"></i>data <i class="lg ctrl"></i>control <i class="lg act"></i>active at this T-state
         </span>
       </div>
       <div class="cpu-body">
@@ -100,20 +100,20 @@
             <p id="step-desc"></p>
           </div>
           <div class="card">
-            <div class="card-h">Bus externes</div>
+            <div class="card-h">External buses</div>
             <div class="kv"><span>A0–A15</span><b class="addr" id="step-addr"></b></div>
             <div class="kv"><span>D0–D7</span><b class="data" id="step-data"></b></div>
           </div>
           <div class="card">
-            <div class="card-h">Signaux de commande</div>
+            <div class="card-h">Control signals</div>
             <div class="pinleds" id="pinleds"></div>
           </div>
-          <div class="card small">Cliquez sur un bloc pour le mettre en évidence ; le chronogramme du bas suit le T-state courant.</div>
+          <div class="card small">Click a block to highlight it; the timing diagram below follows the current T-state.</div>
         </div>
       </div>
     </section>
 
-    <!-- Carte mère -->
+    <!-- Motherboard -->
     <section class="pane" data-group="ws" data-name="board">
       <div class="board-body">
         <div class="board-svg-wrap">
@@ -130,80 +130,80 @@
       <div class="machine">
         <div class="monitor">
           <div class="mon-tools">
-            <select id="mon-type"><option value="color">Moniteur couleur CTM644</option><option value="green">Moniteur vert GT65</option></select>
-            <label><input type="checkbox" id="scanlines" checked> Lignes de balayage</label>
-            <select id="screen-state"><option value="now">État actuel (pause à &amp;4003)</option><option value="end">Après exécution du programme</option></select>
-            <span class="mon-info">Mode 1 · 320×200 · 4 couleurs · 50 Hz</span>
+            <select id="mon-type"><option value="color">CTM644 color monitor</option><option value="green">GT65 green monitor</option></select>
+            <label><input type="checkbox" id="scanlines" checked> Scanlines</label>
+            <select id="screen-state"><option value="now">Current state (paused at &amp;4003)</option><option value="end">After the program has run</option></select>
+            <span class="mon-info">Mode 1 · 320×200 · 4 colors · 50 Hz</span>
           </div>
           <div class="bezel"><div class="crt"><canvas id="screen" width="768" height="544"></canvas><div class="scan"></div></div>
             <div class="mon-brand">AMSTRAD <span>CTM644</span><i class="pwr"></i></div></div>
         </div>
         <div class="periph">
           <div class="card">
-            <div class="card-h">Lecteurs de disquettes <span class="tag">.DSK / EDSK</span></div>
+            <div class="card-h">Floppy drives <span class="tag">.DSK / EDSK</span></div>
             <div class="drive"><div class="slot"><span class="disk">demo.dsk</span></div><i class="led on"></i>
-              <div class="drv-info"><b>A:</b> demo.dsk · 178 Ko · format DATA<br><span class="muted">Piste 00 · Secteur &amp;C1 · moteur en marche</span></div></div>
-            <div class="drive"><div class="slot empty"><span>glisser un .dsk</span></div><i class="led"></i>
-              <div class="drv-info"><b>B:</b> vide<br><span class="muted">Insérer… · Nouvelle disquette formatée</span></div></div>
-            <table class="cat"><tr><th>Catalogue A:</th><th>Taille</th></tr>
-              <tr><td>BONJOUR .BIN</td><td>1K</td></tr><tr><td>BONJOUR .BAS</td><td>1K</td></tr><tr><td>DEMO    .BIN</td><td>12K</td></tr></table>
+              <div class="drv-info"><b>A:</b> demo.dsk · 178 KB · DATA format<br><span class="muted">Track 00 · Sector &amp;C1 · motor on</span></div></div>
+            <div class="drive"><div class="slot empty"><span>drop a .dsk</span></div><i class="led"></i>
+              <div class="drv-info"><b>B:</b> empty<br><span class="muted">Insert… · New formatted disk</span></div></div>
+            <table class="cat"><tr><th>Catalog A:</th><th>Size</th></tr>
+              <tr><td>HELLO   .BIN</td><td>1K</td></tr><tr><td>HELLO   .BAS</td><td>1K</td></tr><tr><td>DEMO    .BIN</td><td>12K</td></tr></table>
           </div>
           <div class="card">
-            <div class="card-h">Imprimante virtuelle <span class="tag">Centronics · DMP2000</span></div>
+            <div class="card-h">Virtual printer <span class="tag">Centronics · DMP2000</span></div>
             <div class="paper"><pre id="paper"></pre></div>
-            <div class="row-btns"><button class="tb">Enregistrer en PDF</button><button class="tb">Enregistrer en .txt</button><button class="tb">Arracher la feuille</button></div>
+            <div class="row-btns"><button class="tb">Save as PDF</button><button class="tb">Save as .txt</button><button class="tb">Tear off the sheet</button></div>
           </div>
           <div class="card">
-            <div class="card-h">Haut-parleur · AY-3-8912 <span class="tag">3 voix + bruit</span></div>
+            <div class="card-h">Speaker · AY-3-8912 <span class="tag">3 voices + noise</span></div>
             <canvas id="scope" width="520" height="110"></canvas>
             <div class="ay" id="ay"></div>
-            <div class="row-btns"><label>Volume <input type="range" value="70"></label><label><input type="checkbox" checked> Son activé</label></div>
+            <div class="row-btns"><label>Volume <input type="range" value="70"></label><label><input type="checkbox" checked> Sound on</label></div>
           </div>
         </div>
         <div class="keyboard-wrap">
-          <div class="card-h">Clavier CPC 6128 <span class="tag">cliquez ou tapez au clavier du PC</span><span class="muted" id="key-info"></span></div>
+          <div class="card-h">CPC 6128 keyboard <span class="tag">click or type on the PC keyboard</span><span class="muted" id="key-info"></span></div>
           <div class="keyboard" id="keyboard"></div>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- ============ Colonne droite ============ -->
+  <!-- ============ Right column ============ -->
   <aside class="rightbar">
-    <div class="ph">Registres <span class="muted" id="reg-note"></span></div>
+    <div class="ph">Registers <span class="muted" id="reg-note"></span></div>
     <div class="regs" id="regs"></div>
-    <div class="ph">Drapeaux (F)</div>
+    <div class="ph">Flags (F)</div>
     <div class="flags" id="flags"></div>
-    <div class="ph">Accumulateur A</div>
+    <div class="ph">Accumulator A</div>
     <div class="bits" id="abits"></div>
-    <div class="ph">Interruptions</div>
+    <div class="ph">Interrupts</div>
     <div class="intr"><span>IM <b>1</b></span><span>IFF1 <b>1</b></span><span>IFF2 <b>1</b></span><span>HALT <b>0</b></span></div>
-    <div class="ph">Pile (SP)</div>
+    <div class="ph">Stack (SP)</div>
     <div class="stack" id="stack"></div>
-    <div class="ph">Points d'arrêt</div>
+    <div class="ph">Breakpoints</div>
     <div class="bplist" id="bplist"></div>
-    <div class="ph">Expressions</div>
+    <div class="ph">Watch</div>
     <div class="watch" id="watch"></div>
   </aside>
 
-  <!-- ============ Dock bas ============ -->
+  <!-- ============ Bottom dock ============ -->
   <section class="dock">
     <div class="tabs" data-tabs="dock">
-      <button class="tab active" data-tab="la">Chronogrammes</button>
-      <button class="tab" data-tab="mem">Mémoire</button>
-      <button class="tab" data-tab="dis">Désassemblage</button>
-      <button class="tab" data-tab="io">Ports E/S</button>
+      <button class="tab active" data-tab="la">Timing diagrams</button>
+      <button class="tab" data-tab="mem">Memory</button>
+      <button class="tab" data-tab="dis">Disassembly</button>
+      <button class="tab" data-tab="io">I/O ports</button>
       <button class="tab" data-tab="con">Console</button>
-      <button class="tb dock-toggle" id="dock-toggle" title="Replier / déplier le panneau">▾ Replier</button>
+      <button class="tb dock-toggle" id="dock-toggle" title="Collapse / expand the panel">▾ Collapse</button>
     </div>
     <div class="pane active" data-group="dock" data-name="la">
       <div class="la-tools">
         <button class="tb" id="la-zm">−</button><button class="tb" id="la-zp">+</button>
-        <span>Déclenchement : <b>/M1 ↓</b> à <b>&amp;4003</b></span>
-        <span>Base de temps : <b>31,25 ns</b>/div · CLK 4 MHz</span>
+        <span>Trigger: <b>/M1 ↓</b> at <b>&amp;4003</b></span>
+        <span>Time base: <b>31.25 ns</b>/div · CLK 4 MHz</span>
         <span id="la-cur"></span>
-        <span class="muted">Cliquez une ligne de la carte mère pour l'ajouter ici</span>
-        <button class="tb" style="margin-left:auto">Exporter .VCD</button>
+        <span class="muted">Click a motherboard line to add it here</span>
+        <button class="tb" style="margin-left:auto">Export .VCD</button>
       </div>
       <div class="la">
         <div class="la-names" id="la-names"></div>

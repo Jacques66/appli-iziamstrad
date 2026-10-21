@@ -1,9 +1,9 @@
-/* Z80 Studio — désassembleur Z80.
-   Décode les tables non préfixée, CB, ED, DD, FD, DDCB et FDCB, y compris les
-   opcodes non documentés (IXH/IXL, SLL, doublons d'ED, DDCB avec copie dans un
-   registre). Le texte produit est réassemblable par l'assembleur du projet.
-   Les durées sont celles de Zilog ; [pris, non pris] pour les instructions
-   conditionnelles et les répétitions de blocs. */
+/* Z80 Studio — Z80 disassembler.
+   Decodes the unprefixed, CB, ED, DD, FD, DDCB and FDCB tables, including the
+   undocumented opcodes (IXH/IXL, SLL, ED duplicates, DDCB with copy into a
+   register). The output text can be reassembled by the project's assembler.
+   Timings are Zilog's; [taken, not taken] for conditional instructions
+   and block repeats. */
 
 const R8 = ['B', 'C', 'D', 'E', 'H', 'L', '(HL)', 'A'];
 const RP = ['BC', 'DE', 'HL', 'SP'];
@@ -30,15 +30,15 @@ function ins(mnemonic, operands, tstates, target = null, flow = null) {
   return { mnemonic, operands, tstates, target, flow };
 }
 
-// ADD, ADC et SBC portent l'accumulateur explicitement ; les autres non
+// ADD, ADC and SBC show the accumulator explicitly; the others do not
 function alu(y, operand, tstates) {
   const ops = y === 0 || y === 1 || y === 3 ? ['A', operand] : [operand];
   return ins(ALU[y], ops, tstates);
 }
 
-/* Contexte de décodage : lecture des octets, et substitution HL -> IX/IY
-   quand un préfixe DD/FD est actif. `used` indique que le préfixe a servi,
-   `indexedMem` que (HL) est devenu (IX+d). */
+/* Decoding context: byte reading, and HL -> IX/IY substitution
+   when a DD/FD prefix is active. `used` tells that the prefix was used,
+   `indexedMem` that (HL) became (IX+d). */
 function makeContext(addr, bytes, fetch, idx) {
   let disp = null;
   const c = {
@@ -72,7 +72,7 @@ function makeContext(addr, bytes, fetch, idx) {
   return c;
 }
 
-// Table principale (sans préfixe, ou derrière DD/FD via le contexte)
+// Main table (unprefixed, or behind DD/FD through the context)
 function decodeMain(op, c) {
   const x = op >> 6, y = (op >> 3) & 7, z = op & 7, p = y >> 1, q = y & 1;
 
@@ -108,7 +108,7 @@ function decodeMain(op, c) {
       case 5:
         return ins('DEC', [c.r(y)], y === 6 ? 11 : 4);
       case 6: {
-        // le déplacement (IX+d) précède l'octet immédiat
+        // the (IX+d) displacement comes before the immediate byte
         const dst = c.r(y);
         return ins('LD', [dst, c.n()], y === 6 ? 10 : 7);
       }
@@ -119,7 +119,7 @@ function decodeMain(op, c) {
 
   if (x === 1) {
     if (op === 0x76) return ins('HALT', [], 4, null, 'halt');
-    // avec (IX+d), H et L gardent leur sens ordinaire
+    // with (IX+d), H and L keep their ordinary meaning
     if (y === 6) return ins('LD', [c.r(6), R8[z]], 7);
     if (z === 6) return ins('LD', [R8[y], c.r(6)], 7);
     return ins('LD', [c.r(y), c.r(z)], 4);
@@ -152,7 +152,7 @@ function decodeMain(op, c) {
         case 5: return ins('EX', ['DE', 'HL'], 4);
         case 6: return ins('DI', [], 4);
         case 7: return ins('EI', [], 4);
-        default: return null; // CB : traité en amont
+        default: return null; // CB: handled upstream
       }
     case 4: {
       const target = c.nn();
@@ -164,7 +164,7 @@ function decodeMain(op, c) {
         const target = c.nn();
         return ins('CALL', [word(target)], 17, target, 'call');
       }
-      return null; // DD, ED, FD : traités en amont
+      return null; // DD, ED, FD: handled upstream
     case 6:
       return alu(y, c.n(), 7);
     default:
@@ -172,8 +172,8 @@ function decodeMain(op, c) {
   }
 }
 
-/* Table CB. `mem` est l'opérande mémoire indexé ((IX+d)) pour DDCB/FDCB,
-   ou null pour la forme simple. */
+/* CB table. `mem` is the indexed memory operand ((IX+d)) for DDCB/FDCB,
+   or null for the plain form. */
 function decodeCB(op, mem) {
   const x = op >> 6, y = (op >> 3) & 7, z = op & 7;
   if (mem === null) {
@@ -183,13 +183,13 @@ function decodeCB(op, mem) {
     return ins(x === 2 ? 'RES' : 'SET', [String(y), r], z === 6 ? 15 : 8);
   }
   if (x === 1) return ins('BIT', [String(y), mem], 20);
-  // non documenté : le résultat est aussi copié dans un registre
+  // undocumented: the result is also copied into a register
   const copy = z === 6 ? [] : [R8[z]];
   if (x === 0) return ins(ROT[y], [mem, ...copy], 23);
   return ins(x === 2 ? 'RES' : 'SET', [String(y), mem, ...copy], 23);
 }
 
-// Table ED ; null pour un opcode non défini
+// ED table; null for an undefined opcode
 function decodeED(op, c) {
   const x = op >> 6, y = (op >> 3) & 7, z = op & 7, p = y >> 1, q = y & 1;
   if (x === 1) {
@@ -262,7 +262,7 @@ export function disassemble(read, addr) {
       else r = null;
     }
     if (!r) {
-      // préfixe sans effet : il se lit seul, le décodage reprend après lui
+      // prefix without effect: it reads on its own, decoding resumes after it
       bytes.length = 1;
       r = dataBytes(bytes, 4);
     }

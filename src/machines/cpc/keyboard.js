@@ -1,7 +1,7 @@
-/* Clavier du CPC : matrice de 10 lignes × 8 colonnes, lue par le PSG (port A)
-   après sélection de la ligne par le PPI (port C, bits 0–3). Un bit à 0 = touche enfoncée. */
+/* CPC keyboard: 10-row × 8-column matrix, read by the PSG (port A)
+   after the row is selected by the PPI (port C, bits 0–3). A bit at 0 = key pressed. */
 
-// [ligne, bit] de chaque touche (nom affiché sur le clavier du CPC 6128, disposition anglaise)
+// [row, bit] of each key (name printed on the CPC 6128 keyboard, English layout)
 export const KEYS = {
   'CUR_UP': [0, 0], 'CUR_RIGHT': [0, 1], 'CUR_DOWN': [0, 2], 'F9': [0, 3], 'F6': [0, 4], 'F3': [0, 5], 'ENTER': [0, 6], 'F.': [0, 7],
   'CUR_LEFT': [1, 0], 'COPY': [1, 1], 'F7': [1, 2], 'F8': [1, 3], 'F5': [1, 4], 'F1': [1, 5], 'F2': [1, 6], 'F0': [1, 7],
@@ -15,7 +15,7 @@ export const KEYS = {
   'JOY_UP': [9, 0], 'JOY_DOWN': [9, 1], 'JOY_LEFT': [9, 2], 'JOY_RIGHT': [9, 3], 'JOY_FIRE2': [9, 4], 'JOY_FIRE1': [9, 5], 'DEL': [9, 7],
 };
 
-// caractère → [touche, avec SHIFT] (clavier anglais du CPC 6128)
+// character → [key, with SHIFT] (English CPC 6128 keyboard)
 export const CHAR_KEYS = (() => {
   const m = {};
   for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') { m[c.toLowerCase()] = [c, false]; m[c] = [c, true]; }
@@ -31,8 +31,8 @@ export const CHAR_KEYS = (() => {
 export class Keyboard {
   constructor() {
     this.matrix = new Uint8Array(10).fill(0xFF);
-    this.charKeys = CHAR_KEYS; // remplacée par la table tirée de la ROM (voir keymap.js)
-    this.queue = [];          // frappe automatique : [touche, avec SHIFT]
+    this.charKeys = CHAR_KEYS; // replaced by the table taken from the ROM (see keymap.js)
+    this.queue = [];          // automatic typing: [key, with SHIFT]
     this.autoState = null;
   }
   reset() { this.matrix.fill(0xFF); this.queue = []; this.autoState = null; }
@@ -45,7 +45,7 @@ export class Keyboard {
   readLine(line) { return line < 10 ? this.matrix[line] : 0xFF; }
   isDown(key) { const k = KEYS[key]; return !!k && !(this.matrix[k[0]] & (1 << k[1])); }
 
-  // tape un texte (frappe automatique, collage) ; retourne le nombre de caractères ignorés
+  // types a text (automatic typing, paste); returns the number of characters ignored
   type(text) {
     let skipped = 0;
     for (const ch of text.replace(/\r\n?/g, '\r').replace(/\n/g, '\r').replace(/\t/g, ' ')) {
@@ -54,9 +54,9 @@ export class Keyboard {
     }
     return skipped;
   }
-  // appelée à chaque trame (50 Hz)
-  // touche maintenue 2 trames puis relâchée 1 trame ; si la suivante est la même touche, le relâchement
-  // dure 3 trames : le firmware doit voir la touche relevée pour accepter une nouvelle frappe
+  // called on every frame (50 Hz)
+  // key held for 2 frames then released for 1 frame; if the next one is the same key, the release
+  // lasts 3 frames: the firmware must see the key up to accept a new keystroke
   frame() {
     const s = this.autoState;
     if (s) {
@@ -76,7 +76,7 @@ export class Keyboard {
     if (k[1]) this.set('SHIFT', true);
     this.set(k[0], true);
   }
-  // trames sans aucune touche avant la frappe suivante (laisse le firmware voir Ctrl/Shift relâchés)
+  // frames with no key at all before the next keystroke (lets the firmware see Ctrl/Shift released)
   pause(frames) { this.queue.push({ pause: frames }); }
   get typing() { return !!this.autoState || this.queue.length > 0; }
 }

@@ -4,15 +4,15 @@ import { parseDSK, writeDSK, blankDisk } from '../src/machines/cpc/dsk.js';
 import { SCREEN_W, SCREEN_H } from '../src/machines/cpc/gatearray.js';
 import { screenText } from '../src/machines/cpc/screentext.js';
 
-/* Panneau « Machine » du CPC 6128 : écran, clavier (virtuel et clavier du PC),
-   lecteurs de disquettes, imprimante, haut-parleur (Web Audio). */
+/* CPC 6128 "Machine" panel: screen, keyboard (virtual and PC keyboard),
+   disc drives, printer, speaker (Web Audio). */
 
 let m = null, log = () => {};
 let image = null;
-const pressed = new Map();     // code de touche du PC → { key }
-const sticky = new Set();      // SHIFT / CONTROL du clavier virtuel
+const pressed = new Map();     // PC key code → { key }
+const sticky = new Set();      // SHIFT / CONTROL of the virtual keyboard
 
-// appelée à chaque passage sur un CPC (anglais ou français) : le clavier virtuel suit la ROM
+// called on every switch to a CPC (English or French): the virtual keyboard follows the ROM
 export function initCpcPanel(machine, logger) {
   m = machine; log = logger;
   image = new ImageData(new Uint8ClampedArray(m.ga.pixels.buffer), SCREEN_W, SCREEN_H);
@@ -24,27 +24,27 @@ export function initCpcPanel(machine, logger) {
 }
 const st = { paperDirty: true, drivesDirty: true, lastLed: '' };
 
-/* ---------- Écran ---------- */
+/* ---------- Screen ---------- */
 export function drawScreen() {
   if (!m) return;
   $('#screen').getContext('2d').putImageData(image, 0, 0);
   const c = m.crtc;
-  $('#mon-info').textContent = `Mode ${m.ga.mode} · ${[160, 320, 640][m.ga.mode]}×200 · trame ${m.frames} · faisceau ligne ${c.vcc * (c.regs[9] + 1) + c.vlc}`;
+  $('#mon-info').textContent = `Mode ${m.ga.mode} · ${[160, 320, 640][m.ga.mode]}×200 · frame ${m.frames} · beam line ${c.vcc * (c.regs[9] + 1) + c.vlc}`;
 }
 $('#mon-type').addEventListener('change', () => { if (!m) return; m.ga.monochrome = $('#mon-type').value === 'green'; m.ga.buildPalette(); });
 $('#scanlines').addEventListener('change', () => $('#crt .scan').classList.toggle('off', !$('#scanlines').checked));
 $('#btn-copytext').addEventListener('click', async () => {
   const text = screenText(m).join('\n');
-  try { await navigator.clipboard.writeText(text); log('Texte de l\'écran copié dans le presse-papiers.'); }
-  catch { log('Copie refusée par le navigateur. Texte de l\'écran :\n' + esc(text)); }
+  try { await navigator.clipboard.writeText(text); log('Screen text copied to the clipboard.'); }
+  catch { log('Copy refused by the browser. Screen text:\n' + esc(text)); }
 });
 
-/* ---------- Plein écran ---------- */
-// Sous Chrome/Edge, le verrouillage du clavier envoie aussi Échap au CPC (maintenir Échap pour quitter).
+/* ---------- Full screen ---------- */
+// In Chrome/Edge, keyboard lock also sends Esc to the CPC (hold Esc to exit).
 export function toggleFullscreen() {
   const crt = $('#crt');
   if (document.fullscreenElement) document.exitFullscreen();
-  else crt.requestFullscreen?.().catch(err => log(`Plein écran refusé par le navigateur : ${esc(err.message)}`, 'w'));
+  else crt.requestFullscreen?.().catch(err => log(`Full screen refused by the browser: ${esc(err.message)}`, 'w'));
 }
 function fsHint(text) {
   const h = $('#fs-hint');
@@ -55,12 +55,12 @@ function fsHint(text) {
 }
 document.addEventListener('fullscreenchange', async () => {
   const on = document.fullscreenElement === $('#crt');
-  $('#btn-fullscreen').textContent = on ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
+  $('#btn-fullscreen').textContent = on ? '⛶ Exit full screen' : '⛶ Full screen';
   if (on) {
     $('#crt').focus({ preventScroll: true });
     let locked = false;
-    try { await navigator.keyboard?.lock?.(); locked = !!navigator.keyboard?.lock; } catch { /* verrouillage indisponible */ }
-    fsHint(locked ? 'Clavier relié au CPC · maintenir Échap pour quitter' : 'Clavier relié au CPC · Échap pour quitter (double-clic aussi)');
+    try { await navigator.keyboard?.lock?.(); locked = !!navigator.keyboard?.lock; } catch { /* keyboard lock unavailable */ }
+    fsHint(locked ? 'Keyboard connected to the CPC · hold Esc to exit' : 'Keyboard connected to the CPC · Esc to exit (or double-click)');
   } else {
     navigator.keyboard?.unlock?.();
     releaseAllKeys();
@@ -69,7 +69,7 @@ document.addEventListener('fullscreenchange', async () => {
 $('#btn-fullscreen').addEventListener('click', toggleFullscreen);
 $('#crt').addEventListener('dblclick', toggleFullscreen);
 
-/* ---------- Clavier ---------- */
+/* ---------- Keyboard ---------- */
 const LAYOUT = {
   main: [
     [['ESC', 'ESC'], ['1'], ['2'], ['3'], ['4'], ['5'], ['6'], ['7'], ['8'], ['9'], ['0'], ['-'], ['^'], ['CLR', 'CLR', 40], ['DEL', 'DEL', 40]],
@@ -86,8 +86,8 @@ const LAYOUT = {
     [['←', 'CUR_LEFT'], ['↓', 'CUR_DOWN'], ['→', 'CUR_RIGHT']],
   ],
 };
-// inscriptions des touches tirées des tables de la ROM : AZERTY sur le CPC français ;
-// le symbole obtenu avec SHIFT est gravé en haut de la touche comme sur le vrai clavier
+// key legends taken from the ROM tables: AZERTY on the French CPC;
+// the SHIFT symbol is printed at the top of the key as on the real keyboard
 function buildKeyboard() {
   const labels = m.keymap.labels;
   const mk = rows => rows.map(r => `<div class="kb-row">${r.map(([label0, key = label0, w, c]) => {
@@ -99,7 +99,7 @@ function buildKeyboard() {
 }
 function showKey(key) {
   const k = KEYS[key];
-  if (k) $('#key-info').textContent = `${key} → ligne ${k[0]}, bit ${k[1]} de la matrice (lue par le PSG, port A)`;
+  if (k) $('#key-info').textContent = `${key} → matrix line ${k[0]}, bit ${k[1]} (read through the PSG, port A)`;
 }
 export function refreshKeys() {
   if (!m) return;
@@ -126,16 +126,16 @@ const SPECIAL = {
   ControlLeft: 'CONTROL', ControlRight: 'CONTROL', AltLeft: 'COPY', ArrowUp: 'CUR_UP', ArrowDown: 'CUR_DOWN', ArrowLeft: 'CUR_LEFT', ArrowRight: 'CUR_RIGHT',
   Numpad0: 'F0', Numpad1: 'F1', Numpad2: 'F2', Numpad3: 'F3', Numpad4: 'F4', Numpad5: 'F5', Numpad6: 'F6', Numpad7: 'F7', Numpad8: 'F8', Numpad9: 'F9', NumpadDecimal: 'F.',
 };
-// Caractères, Entrée et Effacement passent par la file de frappe du clavier (cadencée sur les trames :
-// aucun appui bref n'est perdu, quelle que soit la disposition du clavier du PC). Les autres touches
-// (flèches, Shift, Control, Copy, pavé numérique…) sont maintenues tant que la touche du PC l'est.
+// Characters, Enter and Backspace go through the keyboard typing queue (paced on frames:
+// no short press is lost, whatever the PC keyboard layout). The other keys
+// (arrows, Shift, Control, Copy, numeric keypad…) are held as long as the PC key is.
 const QUEUED = { Enter: ['RETURN', false], Backspace: ['DEL', false] };
-// touches mortes du clavier français : le caractère est tapé tout de suite, sans attendre la lettre suivante
+// dead keys of the French keyboard: the character is typed at once, without waiting for the next letter
 const DEAD = { BracketLeft: '^', Digit7: '`' };
-// true si la touche est destinée au CPC
+// true if the key is meant for the CPC
 export function hostKey(e, down) {
   if (!m) return false;
-  // AltGr = Ctrl gauche fictif + Alt droit : on relâche le CONTROL du CPC posé par ce Ctrl fictif
+  // AltGr = fake left Ctrl + right Alt: release the CPC CONTROL set by that fake Ctrl
   if (e.key === 'AltGraph' || e.code === 'AltRight') {
     const c = pressed.get('ControlLeft');
     if (down && c) { pressed.delete('ControlLeft'); m.keyboard.set('CONTROL', false); }
@@ -169,17 +169,17 @@ export function releaseAllKeys() {
   m.keyboard.matrix.fill(0xFF);
 }
 
-/* ---------- Disquettes ---------- */
+/* ---------- Discs ---------- */
 let pendingDrive = 0;
 function renderDrives() {
   const a = m.fdc.activity || {};
   $('#drives').innerHTML = [0, 1].map(i => {
-    const d = m.fdc.disk(i), on = a.motor && a.drive === i && (a.phase === 'exécution' || a.reading || a.writing);
+    const d = m.fdc.disk(i), on = a.motor && a.drive === i && (a.phase === 'execution' || a.reading || a.writing);
     return `<div class="drive" data-d="${i}">
-      <div class="slot${d ? '' : ' empty'}">${d ? `<span class="disk">${esc(d.name || 'disque')}</span>` : '<span>déposer un .dsk</span>'}</div><i class="led${on ? ' on' : ''}"></i>
-      <div class="drv-info"><b>${i ? 'B' : 'A'}:</b> ${d ? `${esc(d.name || 'sans nom')}${d.dirty ? ' · <span class="w">modifié</span>' : ''}` : 'vide'}<br>
-        <span class="muted">piste ${(a.track || [0, 0])[i]} · ${a.motor ? 'moteur en marche' : 'moteur arrêté'}</span><br>
-        <span class="drv-btns"><button class="tb" data-act="insert">Insérer…</button><button class="tb" data-act="blank">Vierge</button>${d ? '<button class="tb" data-act="save">Enregistrer</button><button class="tb" data-act="eject">Éjecter</button>' : ''}</span></div></div>`;
+      <div class="slot${d ? '' : ' empty'}">${d ? `<span class="disk">${esc(d.name || 'disc')}</span>` : '<span>drop a .dsk</span>'}</div><i class="led${on ? ' on' : ''}"></i>
+      <div class="drv-info"><b>${i ? 'B' : 'A'}:</b> ${d ? `${esc(d.name || 'unnamed')}${d.dirty ? ' · <span class="w">modified</span>' : ''}` : 'empty'}<br>
+        <span class="muted">track ${(a.track || [0, 0])[i]} · ${a.motor ? 'motor on' : 'motor off'}</span><br>
+        <span class="drv-btns"><button class="tb" data-act="insert">Insert…</button><button class="tb" data-act="blank">Blank</button>${d ? '<button class="tb" data-act="save">Save</button><button class="tb" data-act="eject">Eject</button>' : ''}</span></div></div>`;
   }).join('');
   renderCatalog();
   st.drivesDirty = false;
@@ -189,12 +189,12 @@ $('#drives').addEventListener('click', e => {
   const i = +b.closest('[data-d]').dataset.d;
   switch (b.dataset.act) {
     case 'insert': pendingDrive = i; $('#dsk-in').click(); break;
-    case 'blank': { const d = blankDisk('data'); d.name = 'vierge.dsk'; m.fdc.insert(i, d); log(`Disquette vierge (format DATA) insérée en ${i ? 'B' : 'A'}:`); break; }
+    case 'blank': { const d = blankDisk('data'); d.name = 'blank.dsk'; m.fdc.insert(i, d); log(`Blank disc (DATA format) inserted in ${i ? 'B' : 'A'}:`); break; }
     case 'eject': m.fdc.eject(i); break;
     case 'save': {
       const d = m.fdc.disk(i), a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([writeDSK(d)], { type: 'application/octet-stream' }));
-      a.download = (d.name || 'disque.dsk').replace(/(\.dsk)?$/i, '.dsk');
+      a.download = (d.name || 'disc.dsk').replace(/(\.dsk)?$/i, '.dsk');
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       d.dirty = false;
@@ -208,8 +208,8 @@ async function insertFile(file, i) {
     const d = parseDSK(new Uint8Array(await file.arrayBuffer()));
     d.name = file.name;
     m.fdc.insert(i, d);
-    log(`${esc(file.name)} inséré en ${i ? 'B' : 'A'}: — tapez CAT puis RUN"nom`);
-  } catch (err) { log(`${esc(file.name)} : ${esc(err.message)}`, 'err'); }
+    log(`${esc(file.name)} inserted in ${i ? 'B' : 'A'}: — type CAT then RUN"name`);
+  } catch (err) { log(`${esc(file.name)}: ${esc(err.message)}`, 'err'); }
   renderDrives();
 }
 $('#dsk-in').addEventListener('change', e => { const f = e.target.files[0]; if (f) insertFile(f, pendingDrive); e.target.value = ''; });
@@ -220,7 +220,7 @@ $('#drives').addEventListener('drop', e => {
   if (f) insertFile(f, dr ? +dr.dataset.d : 0);
 });
 
-// catalogue AMSDOS du lecteur A: (format DATA : piste 0, secteurs &C1–&C4 ; SYSTEM : piste 2, &41–&44)
+// AMSDOS catalog of drive A: (DATA format: track 0, sectors &C1–&C4; SYSTEM: track 2, &41–&44)
 function renderCatalog() {
   const d = m.fdc.disk(0);
   if (!d) { $('#cat').innerHTML = ''; return; }
@@ -238,10 +238,10 @@ function renderCatalog() {
       files.set(name, (files.get(name) || 0) + e[15] * 128);
     }
   }
-  $('#cat').innerHTML = `<tr><th>Catalogue A:</th><th>Taille</th></tr>` + ([...files].map(([n, s]) => `<tr><td>${esc(n)}</td><td>${Math.ceil(s / 1024)}K</td></tr>`).join('') || '<tr><td class="muted">aucun fichier</td><td></td></tr>');
+  $('#cat').innerHTML = `<tr><th>Catalog A:</th><th>Size</th></tr>` + ([...files].map(([n, s]) => `<tr><td>${esc(n)}</td><td>${Math.ceil(s / 1024)}K</td></tr>`).join('') || '<tr><td class="muted">no files</td><td></td></tr>');
 }
 
-/* ---------- Imprimante ---------- */
+/* ---------- Printer ---------- */
 function renderPaper() {
   const pre = $('#paper');
   pre.textContent = m.printer.text.replace(/\r\n?/g, '\n') || '';
@@ -252,13 +252,13 @@ $('#prn-clear').addEventListener('click', () => { m.printer.text = ''; renderPap
 $('#prn-save').addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([m.printer.text.replace(/\r\n?/g, '\n')], { type: 'text/plain' }));
-  a.download = 'imprimante.txt'; a.click();
+  a.download = 'printer.txt'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
-/* ---------- Son ---------- */
+/* ---------- Sound ---------- */
 const audio = { ctx: null, gain: null, next: 0, lastT: 0 };
-// le son est activé par défaut ; le navigateur n'autorise l'audio qu'après un geste de l'utilisateur
+// sound is on by default; the browser only allows audio after a user gesture
 function soundPref(on) { try { if (on == null) return localStorage.getItem('z80studio.sound') !== '0'; localStorage.setItem('z80studio.sound', on ? '1' : '0'); } catch { return true; } }
 $('#sound').checked = soundPref();
 function applySound() {
@@ -275,7 +275,7 @@ $('#sound').addEventListener('change', () => { soundPref($('#sound').checked); a
 const firstGesture = () => { if ($('#sound').checked && (!audio.ctx || audio.ctx.state !== 'running')) applySound(); };
 document.addEventListener('pointerdown', firstGesture);
 document.addEventListener('keydown', firstGesture);
-// appelé après chaque tranche d'exécution ; realtime = vitesse 4 MHz
+// called after each execution slice; realtime = 4 MHz speed
 export function pumpAudio(realtime) {
   const now = m.cpu.cycles;
   if (!audio.ctx || !$('#sound').checked || !realtime) { audio.lastT = now; audio.next = 0; return; }
@@ -314,12 +314,12 @@ function drawScope(ts) {
     }
     g.stroke();
     g.fillStyle = cols[k]; g.font = '10px JetBrains Mono';
-    g.fillText(`${'ABC'[k]}  ${on ? (v.tone ? Math.round(v.freq) + ' Hz' : 'bruit') + '  vol ' + v.volume + (v.env ? ' (env.)' : '') : 'muette'}`, W - 150, yb - 4);
+    g.fillText(`${'ABC'[k]}  ${on ? (v.tone ? Math.round(v.freq) + ' Hz' : 'noise') + '  vol ' + v.volume + (v.env ? ' (env.)' : '') : 'silent'}`, W - 150, yb - 4);
   });
   $('#ay').innerHTML = [...m.psg.regs.slice(0, 14)].map((x, i) => `<span>R${i}<b>${hex(x)}</b></span>`).join('');
 }
 
-/* ---------- Rafraîchissement ---------- */
+/* ---------- Refresh ---------- */
 export function renderCpcPanel(ts) {
   if (!m) return;
   drawScreen();

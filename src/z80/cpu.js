@@ -1,11 +1,11 @@
-/* Cœur Z80A (NMOS, Zilog) — exécution instruction par instruction, T-states exacts.
-   Comportements NMOS reproduits : drapeaux non documentés X/Y, registre MEMPTR (WZ),
-   OUT (C),0 envoie 0, bug de LD A,I / LD A,R (P/V forcé à 0 si une interruption
-   est acceptée juste après), opcodes DDCB à copie dans un registre, SLL.
+/* Z80A core (NMOS, Zilog) — instruction-by-instruction execution, exact T-states.
+   NMOS behaviours reproduced: undocumented X/Y flags, MEMPTR (WZ) register,
+   OUT (C),0 sends 0, LD A,I / LD A,R bug (P/V forced to 0 if an interrupt
+   is accepted right after), DDCB opcodes with copy into a register, SLL.
 
-   Bus attendu : { read(addr), write(addr, v), in(port), out(port, v), intAck?() }.
-   Si `cpu.trace` est un tableau, chaque cycle machine y est ajouté
-   ({ type, addr, data, t }) : M1, MR, MW, IOR, IOW, INTA, X (états internes). */
+   Expected bus: { read(addr), write(addr, v), in(port), out(port, v), intAck?() }.
+   If `cpu.trace` is an array, every machine cycle is appended to it
+   ({ type, addr, data, t }): M1, MR, MW, IOR, IOW, INTA, X (internal states). */
 
 export const FC = 0x01, FN = 0x02, FPV = 0x04, FX = 0x08, FH = 0x10, FY = 0x20, FZ = 0x40, FS = 0x80;
 
@@ -18,7 +18,7 @@ for (let i = 0; i < 256; i++) {
 }
 const sbyte = v => (v & 0x80 ? v - 256 : v);
 
-// Opcodes non préfixés qui utilisent H, L, HL ou (HL) : seuls ceux-là sont modifiés par DD/FD
+// Unprefixed opcodes that use H, L, HL or (HL): only those are modified by DD/FD
 const USES_HL = new Uint8Array(256);
 for (let op = 0x40; op < 0xC0; op++) {
   const s = op & 7, d = (op >> 3) & 7;
@@ -42,8 +42,8 @@ export class Z80 {
     this.ix = 0xFFFF; this.iy = 0xFFFF; this.sp = 0xFFFF; this.pc = 0; this.wz = 0;
     this.i = 0; this.r = 0; this.iff1 = 0; this.iff2 = 0; this.im = 0;
     this.halted = false;
-    this.intLine = false;       // niveau de /INT (vrai = actif)
-    this.intData = 0xFF;        // octet placé sur le bus pendant l'acquittement
+    this.intLine = false;       // /INT level (true = active)
+    this.intData = 0xFF;        // byte placed on the bus during acknowledge
     this.nmiPending = false;
     this.eiDelay = false;
     this.ldair = false;
@@ -51,7 +51,7 @@ export class Z80 {
     this.cycles = 0;
   }
 
-  /* ---------- Accès registres ---------- */
+  /* ---------- Register access ---------- */
   get bc() { return (this.b << 8) | this.c; }
   get de() { return (this.d << 8) | this.e; }
   get hl() { return (this.h << 8) | this.l; }
@@ -77,10 +77,10 @@ export class Z80 {
     const x = { IX: 'ix', IY: 'iy', SP: 'sp', PC: 'pc', WZ: 'wz' }[name];
     if (x) { this[x] = v & 0xFFFF; return; }
     if (name === 'IM') this.im = v; else if (name === 'IFF1') this.iff1 = v ? 1 : 0; else if (name === 'IFF2') this.iff2 = v ? 1 : 0;
-    else throw new Error('registre inconnu : ' + name);
+    else throw new Error('unknown register: ' + name);
   }
 
-  /* ---------- Cycles machine ---------- */
+  /* ---------- Machine cycles ---------- */
   fetchOp() {
     const addr = this.pc, v = this.bus.read(addr);
     this.pc = (addr + 1) & 0xFFFF;
@@ -127,11 +127,11 @@ export class Z80 {
     return lo | (hi << 8);
   }
 
-  /* ---------- Exécution ---------- */
+  /* ---------- Execution ---------- */
   irq(on, data = 0xFF) { this.intLine = !!on; this.intData = data & 0xFF; }
   nmi() { this.nmiPending = true; }
 
-  // Exécute une instruction (ou l'acceptation d'une interruption). Retourne les T-states.
+  // Executes one instruction (or the acceptance of an interrupt). Returns the T-states.
   step() {
     const start = this.cycles;
     if (this.nmiPending) {
@@ -144,13 +144,13 @@ export class Z80 {
     if (this.intLine && this.iff1 && !this.eiDelay) {
       this.acceptInt(7);
       this.iff1 = this.iff2 = 0;
-      this.bus.intAck?.();      // le périphérique sait que son interruption est servie
+      this.bus.intAck?.();      // the device knows its interrupt is being serviced
       if (this.im === 2) {
         this.push(this.pc);
         const v = ((this.i << 8) | this.intData) & 0xFFFF;
         this.pc = this.rd(v) | (this.rd((v + 1) & 0xFFFF) << 8);
       } else {
-        // IM 1, ou IM 0 avec une instruction RST sur le bus (seul cas géré en IM 0)
+        // IM 1, or IM 0 with an RST instruction on the bus (only case handled in IM 0)
         this.push(this.pc);
         this.pc = this.im === 1 || (this.intData & 0xC7) !== 0xC7 ? 0x0038 : this.intData & 0x38;
       }
@@ -160,7 +160,7 @@ export class Z80 {
     this.eiDelay = false;
     this.ldair = false;
     if (this.halted) {
-      // HALT : le CPU exécute des NOP sans avancer le PC
+      // HALT: the CPU executes NOPs without advancing PC
       const save = this.pc;
       this.fetchOp();
       this.pc = save;
@@ -170,7 +170,7 @@ export class Z80 {
     let op = this.fetchOp();
     if (op === 0xDD || op === 0xFD) {
       this.idx = op === 0xDD ? 1 : 2;
-      // préfixe sans effet (opcode suivant sans HL, ou autre préfixe) : NOP de 4 T, comme le montre le désassembleur
+      // prefix without effect (next opcode without HL, or another prefix): 4 T NOP, as shown by the disassembler
       if (!USES_HL[this.bus.read(this.pc)]) return this.cycles - start;
       op = this.fetchOp();
     }
@@ -180,26 +180,26 @@ export class Z80 {
 
   acceptInt(t) {
     if (this.halted) { this.halted = false; }
-    if (this.ldair) { this.f &= ~FPV; this.ldair = false; }   // bug NMOS
+    if (this.ldair) { this.f &= ~FPV; this.ldair = false; }   // NMOS bug
     this.r = (this.r & 0x80) | ((this.r + 1) & 0x7F);
     this.cycles += t;
     if (this.trace) this.trace.push({ type: 'INTA', addr: this.pc, data: this.intData, t, refresh: (this.i << 8) | this.r });
   }
 
-  // Exécute jusqu'à `tstates` T-states (au moins une instruction). Retourne les T-states consommés.
+  // Runs up to `tstates` T-states (at least one instruction). Returns the T-states used.
   run(tstates) {
     const start = this.cycles;
     while (this.cycles - start < tstates) this.step();
     return this.cycles - start;
   }
 
-  /* ---------- Registres 8/16 bits, avec substitution IX/IY ---------- */
+  /* ---------- 8/16-bit registers, with IX/IY substitution ---------- */
   xy() { return this.idx === 1 ? this.ix : this.idx === 2 ? this.iy : this.hl; }
   setXY(v) {
     v &= 0xFFFF;
     if (this.idx === 1) this.ix = v; else if (this.idx === 2) this.iy = v; else this.hl = v;
   }
-  // code 0..7 = B C D E H L (HL) A ; plain = vrai pour ignorer IXH/IXL
+  // code 0..7 = B C D E H L (HL) A; plain = true to ignore IXH/IXL
   getR8(code, plain = false) {
     switch (code) {
       case 0: return this.b; case 1: return this.c; case 2: return this.d; case 3: return this.e;
@@ -225,7 +225,7 @@ export class Z80 {
     v &= 0xFFFF;
     if (p === 0) this.bc = v; else if (p === 1) this.de = v; else if (p === 2) this.setXY(v); else this.sp = v;
   }
-  // adresse de l'opérande (HL) ou (IX+d) ; d est lu ici
+  // address of the (HL) or (IX+d) operand; d is read here
   memAddr() {
     if (!this.idx) return this.hl;
     const d = sbyte(this.imm8());
@@ -242,7 +242,7 @@ export class Z80 {
     }
   }
 
-  /* ---------- UAL ---------- */
+  /* ---------- ALU ---------- */
   add8(v, carry) {
     const a = this.a, r = a + v + carry;
     this.a = r & 0xFF;
@@ -252,7 +252,7 @@ export class Z80 {
     const a = this.a, r = a - v - carry, r8 = r & 0xFF;
     const f = (SZ53[r8] & (FS | FZ)) | ((a ^ v ^ r) & FH) | (((a ^ v) & (a ^ r) & 0x80) ? FPV : 0) | (r < 0 ? FC : 0) | FN;
     if (store) { this.a = r8; this.f = f | (r8 & (FY | FX)); }
-    else this.f = f | (v & (FY | FX));   // CP : X/Y viennent de l'opérande
+    else this.f = f | (v & (FY | FX));   // CP: X/Y come from the operand
   }
   alu(k, v) {
     switch (k) {
@@ -305,7 +305,7 @@ export class Z80 {
       case 3: c = v & 1; r = (v >> 1) | ((this.f & FC) << 7); break; // RR
       case 4: c = v >> 7; r = v << 1; break;                       // SLA
       case 5: c = v & 1; r = (v >> 1) | (v & 0x80); break;         // SRA
-      case 6: c = v >> 7; r = (v << 1) | 1; break;                 // SLL (non documentée)
+      case 6: c = v >> 7; r = (v << 1) | 1; break;                 // SLL (undocumented)
       default: c = v & 1; r = v >> 1; break;                       // SRL
     }
     r &= 0xFF;
@@ -329,7 +329,7 @@ export class Z80 {
     this.f = SZ53P[this.a] | (h ? FH : 0) | (this.f & FN) | c;
   }
 
-  /* ---------- Table principale ---------- */
+  /* ---------- Main table ---------- */
   exec(op) {
     if (op >= 0x40 && op < 0x80) {
       if (op === 0x76) { this.halted = true; return; }
@@ -444,14 +444,14 @@ export class Z80 {
       case 0xC1: { const v = this.pop(); if (y >> 1 === 3) this.af = v; else this.setRP(y >> 1, v); return; }
       case 0xC5: { this.x(1); this.push(y >> 1 === 3 ? this.af : this.getRP(y >> 1)); return; }
     }
-    throw new Error('opcode non géré : ' + op.toString(16));
+    throw new Error('unhandled opcode: ' + op.toString(16));
   }
 
-  /* ---------- Préfixe CB (et DDCB / FDCB) ---------- */
+  /* ---------- CB prefix (and DDCB / FDCB) ---------- */
   execCB() {
     if (this.idx) {
       const d = sbyte(this.imm8());
-      const op = this.imm8();   // lu comme une donnée : pas de cycle M1, R n'avance pas
+      const op = this.imm8();   // read as data: no M1 cycle, R does not advance
       this.x(2);
       const a = (this.xy() + d) & 0xFFFF;
       this.wz = a;
@@ -461,7 +461,7 @@ export class Z80 {
       if (k === 1) { this.bit(n, v, a >> 8); return; }
       const res = k === 0 ? this.rot(n, v) : k === 2 ? v & ~(1 << n) : v | (1 << n);
       this.wr(a, res & 0xFF);
-      if (r !== 6) this.setR8(r, res, true);   // copie non documentée dans le registre
+      if (r !== 6) this.setR8(r, res, true);   // undocumented copy into the register
       return;
     }
     const op = this.fetchOp();
@@ -478,19 +478,19 @@ export class Z80 {
     this.setR8(r, k === 0 ? this.rot(n, v) : k === 2 ? v & ~(1 << n) : v | (1 << n), true);
   }
 
-  /* ---------- Préfixe ED ---------- */
+  /* ---------- ED prefix ---------- */
   execED(op) {
     if (op >= 0x40 && op < 0x80) {
       const y = (op >> 3) & 7, p = y >> 1;
       switch (op & 7) {
-        case 0: {   // IN r,(C) ; y = 6 : IN F,(C)
+        case 0: {   // IN r,(C); y = 6: IN F,(C)
           const v = this.ioIn(this.bc);
           this.wz = (this.bc + 1) & 0xFFFF;
           this.f = (this.f & FC) | SZ53P[v];
           if (y !== 6) this.setR8(y, v, true);
           return;
         }
-        case 1:     // OUT (C),r ; y = 6 : OUT (C),0 (NMOS)
+        case 1:     // OUT (C),r; y = 6: OUT (C),0 (NMOS)
           this.ioOut(this.bc, y === 6 ? 0 : this.getR8(y, true));
           this.wz = (this.bc + 1) & 0xFFFF;
           return;
@@ -528,7 +528,7 @@ export class Z80 {
               this.f = (this.f & FC) | SZ53P[this.a]; this.wz = (this.hl + 1) & 0xFFFF;
               return;
             }
-            default: return;   // ED 77 / ED 7F : NOP
+            default: return;   // ED 77 / ED 7F: NOP
           }
       }
     }
@@ -579,6 +579,6 @@ export class Z80 {
         }
       }
     }
-    // autres opcodes ED : NOP de 8 T
+    // other ED opcodes: 8 T NOP
   }
 }

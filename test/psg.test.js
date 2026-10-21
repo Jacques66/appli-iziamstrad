@@ -4,7 +4,7 @@ import { AY38912 } from '../src/machines/cpc/psg.js';
 
 const CPU = 4_000_000, RATE = 48_000;
 
-// Passages par zéro (montants) d'un signal
+// (Rising) zero crossings of a signal
 function risingCrossings(x) {
   let n = 0;
   for (let i = 1; i < x.length; i++) if (x[i - 1] < 0 && x[i] >= 0) n++;
@@ -16,7 +16,7 @@ const maxAbs = (x, from = 0) => {
   return m;
 };
 
-test('masques des registres', () => {
+test('register masks', () => {
   const psg = new AY38912();
   for (let r = 0; r < 16; r++) psg.writeRegister(r, 0xFF, 0);
   assert.deepEqual([...psg.regs], [
@@ -27,9 +27,9 @@ test('masques des registres', () => {
   assert.equal(psg.selected, 0);
 });
 
-test('R14 lit portAInput quand R7 bit 6 = 0, sinon le registre', () => {
+test('R14 reads portAInput when R7 bit 6 = 0, otherwise the register', () => {
   const psg = new AY38912();
-  assert.equal(psg.readRegister(14), 0xFF);       // défaut : aucune touche
+  assert.equal(psg.readRegister(14), 0xFF);       // default: no key
   psg.portAInput = () => 0xDF;
   psg.writeRegister(14, 0x12, 0);
   psg.writeRegister(7, 0x3F, 0);
@@ -38,11 +38,11 @@ test('R14 lit portAInput quand R7 bit 6 = 0, sinon le registre', () => {
   assert.equal(psg.readRegister(14), 0x12);
 });
 
-test('bus() : séquences sélection / écriture / lecture du PPI du CPC', () => {
+test('bus(): CPC PPI select / write / read sequences', () => {
   const psg = new AY38912();
   psg.portAInput = () => 0xFB;
   let t = 0;
-  // OUT &F4xx,reg ; OUT &F6xx,&C0 ; OUT &F6xx,0 puis OUT &F4xx,val ; OUT &F6xx,&80 ; OUT &F6xx,0
+  // OUT &F4xx,reg ; OUT &F6xx,&C0 ; OUT &F6xx,0 then OUT&F4xx,val ; OUT &F6xx,&80 ; OUT &F6xx,0
   const ppiWrite = (reg, val) => {
     psg.bus(0, 0, reg, t += 12);
     assert.equal(psg.bus(1, 1, reg, t += 12), undefined);
@@ -59,32 +59,32 @@ test('bus() : séquences sélection / écriture / lecture du PPI du CPC', () => 
   assert.equal(psg.regs[1], 0x01);
   assert.equal(psg.regs[8], 0x0F);
   assert.equal(psg.selected, 7);
-  // lecture clavier : sélection R14, port A du PPI en entrée, port C = &40, IN A,(&F4xx)
+  // keyboard read: select R14, PPI port A as input, port C = &40, IN A,(&F4xx)
   psg.bus(1, 1, 0x0E, t += 12);
   psg.bus(0, 0, 0x0E, t += 12);
   assert.equal(psg.bus(0, 1, 0xFF, t += 12), 0xFB);
   assert.equal(psg.bus(0, 0, 0xFF, t += 12), undefined);
-  // relecture d'un registre ordinaire
+  // reading back an ordinary register
   psg.bus(1, 1, 0x01, t += 12);
   assert.equal(psg.bus(0, 1, 0xFF, t += 12), 0x01);
 });
 
-test('fréquence d\'une note : TP = &1DE → 1e6 / (16 × 478) Hz à ±1 %', () => {
+test('note frequency: TP = &1DE → 1e6 / (16 × 478) Hz within ±1 %', () => {
   const psg = new AY38912();
   psg.writeRegister(0, 0xDE, 0);
   psg.writeRegister(1, 0x01, 0);
-  psg.writeRegister(7, 0x3E, 0);                  // tonalité A seule
+  psg.writeRegister(7, 0x3E, 0);                  // tone A only
   psg.writeRegister(8, 15, 0);
   const { left } = psg.render(0, CPU, RATE);
   assert.equal(left.length, RATE);
   const expected = 1e6 / (16 * 478);
   assert.ok(Math.abs(expected - 130.75) < 0.01);
   const measured = risingCrossings(left);
-  assert.ok(Math.abs(measured - expected) / expected < 0.01, `mesuré ${measured} Hz`);
+  assert.ok(Math.abs(measured - expected) / expected < 0.01, `measured ${measured} Hz`);
   assert.ok(Math.abs(psg.levels().voices[0].freq - expected) < 1e-9);
 });
 
-test('TP = 0 se comporte comme TP = 1', () => {
+test('TP = 0 behaves like TP = 1', () => {
   const a = new AY38912(), b = new AY38912();
   for (const [psg, tp] of [[a, 0], [b, 1]]) {
     psg.writeRegister(0, tp, 0);
@@ -94,10 +94,10 @@ test('TP = 0 se comporte comme TP = 1', () => {
   assert.deepEqual(a.render(0, 40000, RATE).left, b.render(0, 40000, RATE).left);
 });
 
-test('silence : volume 0, ou voix coupée dans le mixeur (après retrait du continu)', () => {
+test('silence: volume 0, or channel muted in the mixer (after DC removal)', () => {
   const psg = new AY38912();
   psg.writeRegister(0, 0x40, 0);
-  psg.writeRegister(7, 0x38, 0);                  // tonalités actives
+  psg.writeRegister(7, 0x38, 0);                  // tones enabled
   for (let c = 0; c < 3; c++) psg.writeRegister(8 + c, 0, 0);
   let { left, right } = psg.render(0, CPU / 4, RATE);
   assert.equal(maxAbs(left), 0);
@@ -106,16 +106,16 @@ test('silence : volume 0, ou voix coupée dans le mixeur (après retrait du cont
   const cut = new AY38912();
   cut.writeRegister(0, 0x40, 0);
   cut.writeRegister(6, 0x10, 0);
-  cut.writeRegister(7, 0x3F, 0);                  // tonalité et bruit coupés partout
+  cut.writeRegister(7, 0x3F, 0);                  // tone and noise muted everywhere
   cut.writeRegister(8, 15, 0);
   ({ left } = cut.render(0, CPU, RATE));
-  assert.ok(maxAbs(left, RATE / 2) < 1e-4);       // reste un niveau continu, retiré par le passe-haut
+  assert.ok(maxAbs(left, RATE / 2) < 1e-4);       // a DC level remains, removed by the high-pass
 });
 
-test('bruit : LFSR actif, signal non périodique et non nul', () => {
+test('noise: LFSR active, non-periodic and non-zero signal', () => {
   const psg = new AY38912();
   psg.writeRegister(6, 8, 0);
-  psg.writeRegister(7, 0x37, 0);                  // bruit sur A seulement
+  psg.writeRegister(7, 0x37, 0);                  // noise on A only
   psg.writeRegister(8, 15, 0);
   const { left } = psg.render(0, CPU / 2, RATE);
   assert.ok(maxAbs(left) > 0.1);
@@ -123,7 +123,7 @@ test('bruit : LFSR actif, signal non périodique et non nul', () => {
   assert.equal(psg.levels().noiseFreq, 1e6 / (16 * 8));
 });
 
-// Niveau de l'enveloppe au milieu de chacun des `steps` premiers pas
+// Envelope level in the middle of each of the first `steps` steps
 function envelopeSequence(shape, steps = 48, ep = 10) {
   const psg = new AY38912();
   psg.writeRegister(11, ep, 0);
@@ -144,43 +144,43 @@ const down = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
 const up = [...down].reverse();
 const fill = (v, n) => new Array(n).fill(v);
 
-test('enveloppe &00 : descente puis silence', () => {
+test('envelope &00: decay then silence', () => {
   assert.deepEqual(envelopeSequence(0x00), [...down, ...fill(0, 32)]);
 });
 
-test('enveloppe &04 : montée puis silence', () => {
+test('envelope &04: attack then silence', () => {
   assert.deepEqual(envelopeSequence(0x04), [...up, ...fill(0, 32)]);
 });
 
-test('enveloppe &08 : dents de scie descendantes', () => {
+test('envelope &08: falling sawtooth', () => {
   assert.deepEqual(envelopeSequence(0x08), [...down, ...down, ...down]);
 });
 
-test('enveloppe &0A : triangle commençant par la descente', () => {
+test('envelope &0A: triangle starting with the decay', () => {
   assert.deepEqual(envelopeSequence(0x0A), [...down, ...up, ...down]);
 });
 
-test('enveloppe &0B : descente puis maintien au maximum', () => {
+test('envelope &0B: decay then hold at maximum', () => {
   assert.deepEqual(envelopeSequence(0x0B), [...down, ...fill(15, 32)]);
 });
 
-test('enveloppe &0C : dents de scie montantes', () => {
+test('envelope &0C: rising sawtooth', () => {
   assert.deepEqual(envelopeSequence(0x0C), [...up, ...up, ...up]);
 });
 
-test('enveloppe &0D : montée puis maintien au maximum', () => {
+test('envelope &0D: attack then hold at maximum', () => {
   assert.deepEqual(envelopeSequence(0x0D), [...up, ...fill(15, 32)]);
 });
 
-test('enveloppe &0E : triangle commençant par la montée', () => {
+test('envelope &0E: triangle starting with the attack', () => {
   assert.deepEqual(envelopeSequence(0x0E), [...up, ...down, ...up]);
 });
 
-test('enveloppe &0F : montée puis silence maintenu', () => {
+test('envelope &0F: attack then held silence', () => {
   assert.deepEqual(envelopeSequence(0x0F), [...up, ...fill(0, 32)]);
 });
 
-test('écrire R13 relance l\'enveloppe', () => {
+test('writing R13 restarts the envelope', () => {
   const psg = new AY38912();
   psg.writeRegister(11, 1, 0);
   psg.writeRegister(13, 0x00, 0);
@@ -191,20 +191,20 @@ test('écrire R13 relance l\'enveloppe', () => {
   assert.equal(psg.envLevel, 15);
 });
 
-test('volume piloté par l\'enveloppe : la note s\'éteint avec la forme &00', () => {
+test('envelope-driven volume: the note dies out with shape &00', () => {
   const psg = new AY38912();
   psg.writeRegister(0, 0x40, 0);
   psg.writeRegister(7, 0x3E, 0);
   psg.writeRegister(8, 0x10, 0);
   psg.writeRegister(11, 0x00, 0);
-  psg.writeRegister(12, 0x08, 0);                 // EP = &800 → 0,52 s pour 16 pas
+  psg.writeRegister(12, 0x08, 0);                 // EP = &800 → 0.52 s for 16 steps
   psg.writeRegister(13, 0x00, 0);
   const { left } = psg.render(0, CPU, RATE);
   assert.ok(maxAbs(left.subarray(0, RATE / 10)) > 0.3);
   assert.equal(maxAbs(left, Math.ceil(RATE * 0.6)) < 1e-3, true);
 });
 
-test('render() successifs contigus = un seul render() (phases conservées)', () => {
+test('consecutive contiguous render() calls = a single render() (phases preserved)', () => {
   const setup = psg => {
     psg.writeRegister(0, 0x77, 0);
     psg.writeRegister(2, 0x3A, 0);
@@ -216,7 +216,7 @@ test('render() successifs contigus = un seul render() (phases conservées)', () 
     psg.writeRegister(10, 9, 0);
     psg.writeRegister(11, 0x20, 0);
     psg.writeRegister(13, 0x0E, 0);
-    psg.writeRegister(8, 7, 123457);              // écritures horodatées en cours de route
+    psg.writeRegister(8, 7, 123457);              // timestamped writes along the way
     psg.writeRegister(4, 0x99, 250001);
   };
   const one = new AY38912(), many = new AY38912();
@@ -236,7 +236,7 @@ test('render() successifs contigus = un seul render() (phases conservées)', () 
   }
 });
 
-test('render() est déterministe', () => {
+test('render() is deterministic', () => {
   const make = () => {
     const psg = new AY38912();
     psg.writeRegister(6, 3, 0);
@@ -248,7 +248,7 @@ test('render() est déterministe', () => {
   assert.deepEqual(make(), make());
 });
 
-test('stéréo du CPC : A à gauche, B au centre, C à droite', () => {
+test('CPC stereo: A on the left, B in the centre, C on the right', () => {
   const voice = c => {
     const psg = new AY38912();
     psg.writeRegister(2 * c, 0x80, 0);
@@ -265,7 +265,7 @@ test('stéréo du CPC : A à gauche, B au centre, C à droite', () => {
   assert.deepEqual(b.left, b.right);
 });
 
-test('trois voix au maximum restent dans [-1, 1]', () => {
+test('three channels at maximum stay within [-1, 1]', () => {
   const psg = new AY38912();
   psg.writeRegister(0, 0x40, 0);
   psg.writeRegister(2, 0x40, 0);
@@ -277,12 +277,12 @@ test('trois voix au maximum restent dans [-1, 1]', () => {
   assert.ok(maxAbs(left) > 0.4);
 });
 
-test('levels() résume l\'état pour l\'interface', () => {
+test('levels() summarises the state for the UI', () => {
   const psg = new AY38912();
   psg.writeRegister(2, 0xDE, 0);
   psg.writeRegister(3, 0x01, 0);
   psg.writeRegister(6, 0x1F, 0);
-  psg.writeRegister(7, 0x2D, 0);                  // tonalité B, bruit B
+  psg.writeRegister(7, 0x2D, 0);                  // tone B, noise B
   psg.writeRegister(9, 0x0C, 0);
   psg.writeRegister(10, 0x10, 0);
   psg.writeRegister(11, 0x34, 0);

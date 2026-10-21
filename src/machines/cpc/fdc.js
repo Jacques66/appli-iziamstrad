@@ -1,16 +1,16 @@
-/* Contrôleur de disquettes NEC µPD765A, tel que câblé dans l'Amstrad CPC 6128.
+/* NEC µPD765A floppy disk controller, as wired in the Amstrad CPC 6128.
 
-   Ports : &FA7E (écriture, bit 0) moteur des deux lecteurs, &FB7E (lecture) registre
-   d'état principal (MSR), &FB7F données (lecture/écriture).
-   Pas de minutage : les octets sont disponibles immédiatement, RQM reste à 1 pendant
-   les phases actives ; le mode non-DMA est le seul utilisé.
-   Particularités du CPC :
-   - la broche TC n'est pas câblée : READ/WRITE DATA vont jusqu'au secteur EOT et se
-     terminent toujours en « fin anormale » avec ST1 EN (fin de cylindre) ;
-   - seule US0 est câblée : les lecteurs 2 et 3 désignent 0 et 1 ;
-   - un lecteur est prêt s'il contient un disque et que le moteur tourne ;
-   - sur un disque à une face, la sélection de tête n'a pas d'effet (tête unique),
-     mais le H demandé est toujours comparé à l'ID des secteurs. */
+   Ports: &FA7E (write, bit 0) motor of both drives, &FB7E (read) main status
+   register (MSR), &FB7F data (read/write).
+   No timing: bytes are available immediately, RQM stays at 1 during
+   the active phases; non-DMA mode is the only one used.
+   CPC specifics:
+   - the TC pin is not wired: READ/WRITE DATA run up to sector EOT and always
+     end with 'abnormal termination' and ST1 EN (end of cylinder);
+   - only US0 is wired: drives 2 and 3 mean 0 and 1;
+   - a drive is ready if it holds a disk and the motor is running;
+   - on a single-sided disk, head selection has no effect (single head),
+     but the requested H is still compared with the sector IDs. */
 
 const CMD = {
   0x02: { name: 'READ TRACK', len: 9 },
@@ -27,15 +27,15 @@ const CMD = {
   0x0F: { name: 'SEEK', len: 3 },
 };
 
-// Registre d'état principal
+// Main status register
 export const MSR_RQM = 0x80, MSR_DIO = 0x40, MSR_EXM = 0x20, MSR_CB = 0x10;
-// Registres d'état ST0 à ST3
+// Status registers ST0 to ST3
 const ST0_AT = 0x40, ST0_IC = 0x80, ST0_SE = 0x20, ST0_EC = 0x10, ST0_NR = 0x08;
 const ST1_EN = 0x80, ST1_DE = 0x20, ST1_ND = 0x04, ST1_NW = 0x02, ST1_MA = 0x01;
 const ST2_CM = 0x40, ST2_DD = 0x20, ST2_WC = 0x10, ST2_BC = 0x02;
 const ST3_WP = 0x40, ST3_RY = 0x20, ST3_T0 = 0x10, ST3_TS = 0x08;
 
-const PHASES = { idle: 'repos', command: 'commande', exec: 'exécution', result: 'résultat' };
+const PHASES = { idle: 'idle', command: 'command', exec: 'execution', result: 'result' };
 
 const sameId = (s, c, h, r, n) => s.C === c && s.H === h && s.R === r && s.N === n;
 
@@ -45,7 +45,7 @@ export class FDC765 {
     this.onChange = null;
     this.activity = {
       drive: 0, track: [0, 0], side: 0, sector: null, motor: false,
-      phase: 'repos', command: null, reading: false, writing: false,
+      phase: 'idle', command: null, reading: false, writing: false,
     };
     this.reset();
   }
@@ -59,7 +59,7 @@ export class FDC765 {
     this.result = [];
     this.resultPos = 0;
     this.exec = null;
-    this.pending = [];          // interruptions de fin de recherche : { drive, st0, pcn }
+    this.pending = [];          // seek-end interrupts: { drive, st0, pcn }
     this.specify = { srt: 0, hut: 0, hlt: 0, nd: true };
     this.lastData = 0xFF;
     this.activity.command = null;
@@ -67,7 +67,7 @@ export class FDC765 {
     this._activity();
   }
 
-  /* ---------- Lecteurs ---------- */
+  /* ---------- Drives ---------- */
   insert(drive, disk) {
     const dr = this.drives[drive & 1];
     dr.disk = disk;
@@ -121,7 +121,7 @@ export class FDC765 {
       this.op = op;
       this.cmd = [v];
       if (!def) {
-        this.activity.command = 'INVALIDE';
+        this.activity.command = 'INVALID';
         this._result([ST0_IC]);
         return;
       }
@@ -196,7 +196,7 @@ export class FDC765 {
     if (this.onChange) this.onChange(d);
   }
 
-  /* ---------- Exécution des commandes ---------- */
+  /* ---------- Command execution ---------- */
   _run() {
     const c = this.cmd;
     const us = c.length > 1 ? c[1] & 3 : 0;
@@ -238,7 +238,7 @@ export class FDC765 {
     if (this._ready(d)) {
       dr.track = 0;
       dr.index = 0;
-    } else st0 |= ST0_AT | ST0_NR;   // lecteur vide : « non prêt » (le capteur de piste 0 marche sans disque, donc pas EC)
+    } else st0 |= ST0_AT | ST0_NR;   // empty drive: 'not ready' (the track 0 sensor works without a disk, hence no EC)
     this._interrupt(d, st0, dr.track);
     this._idle();
   }
@@ -265,14 +265,14 @@ export class FDC765 {
     const dr = this.drives[d];
     const trk = this._track(d, hd);
     if (!trk || !trk.sectors.length) return this._result([base | ST0_AT, ST1_MA, 0, 0, 0, 0, 0]);
-    // Les ID défilent sous la tête : chaque READ ID rend le secteur suivant
+    // IDs pass under the head: each READ ID returns the next sector
     const s = trk.sectors[dr.index % trk.sectors.length];
     dr.index = (dr.index + 1) % trk.sectors.length;
     this.activity.sector = s.R;
     this._result([base, 0, 0, s.C, s.H, s.R, s.N]);
   }
 
-  // Données d'un secteur à la taille demandée, complétées par l'octet de remplissage
+  // Sector data at the requested size, padded with the filler byte
   _sectorData(sec, n, dtl, filler) {
     const len = n === 0 ? Math.min(dtl, 0x80) : 0x80 << Math.min(n, 8);
     const out = new Uint8Array(len).fill(filler ?? 0xE5);
@@ -300,13 +300,13 @@ export class FDC765 {
       st1 |= sec.st1 & ST1_DE;
       st2 |= sec.st2 & ST2_DD;
       if (isDeleted !== wantDeleted) st2 |= ST2_CM;
-      // Marque inattendue ou erreur de CRC : arrêt après ce secteur
+      // Unexpected mark or CRC error: stop after this sector
       return isDeleted !== wantDeleted || (sec.st1 & ST1_DE) !== 0 || (sec.st2 & ST2_DD) !== 0;
     };
 
     if (!trk || !trk.sectors.length) st1 = ST1_ND | ST1_MA;
     else if (this.op === 0x02) {
-      // READ TRACK : secteurs dans l'ordre physique depuis le trou d'index
+      // READ TRACK: sectors in physical order from the index hole
       let count = 0;
       for (const sec of trk.sectors) {
         if (!sameId(sec, C, H, r, N)) st1 |= ST1_ND;
@@ -336,7 +336,7 @@ export class FDC765 {
       }
     }
 
-    // Sans TC, la commande se termine toujours en fin anormale
+    // Without TC, the command always ends in abnormal termination
     const res = [base | ST0_AT, st1, st2, C, H, r, N];
     if (total === 0) return this._result(res);
     const data = new Uint8Array(total);

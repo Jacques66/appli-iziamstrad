@@ -1,15 +1,15 @@
-/* Vues détaillées des circuits (app/chipviews.js) — toutes les classes sont préfixées cv- */
+/* Detailed chip views (app/chipviews.js) — every class is prefixed cv- */
 .cv { display: flex; flex-direction: column; gap: 12px; font-size: 12.5px; color: var(--text); }
 .cv-err { color: var(--err); font-family: var(--mono); }
 .cv-m { color: var(--muted); font-weight: 400; }
 .cv-note { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
 .cv-lbl { font: 11.5px var(--mono); color: var(--muted); margin-bottom: 4px; }
 
-/* bandeau d'activité au T-state courant */
+/* activity banner for the current T-state */
 .cv-live { background: #2a2610; border: 1px solid var(--active); border-radius: 6px; padding: 6px 10px; font: 12px var(--mono); color: #ffe9a0; box-shadow: 0 0 10px #ffd54f22; }
 .cv-live b { font-family: var(--sans); color: var(--active); margin-right: 6px; text-transform: uppercase; font-size: 10.5px; letter-spacing: .08em; }
 
-/* sections et colonnes */
+/* sections and columns */
 .cv-sec { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 9px 10px; min-width: 0; }
 .cv-sec h4 { margin: 0 0 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
 .cv-sec h4 .cv-m { text-transform: none; letter-spacing: 0; }
@@ -18,7 +18,7 @@
 .cv-cols > .cv-sec.cv-wide { flex: 2 1 540px; }
 .cv-stack { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 
-/* schéma interne : blocs et flèches */
+/* internal diagram: blocks and arrows */
 .cv-flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px 0; }
 .cv-blk { flex: 1 1 96px; max-width: 170px; background: #10151c; border: 1px solid var(--line2); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; margin: 0 2px; }
 .cv-blk b { font-size: 12px; }
@@ -66,7 +66,7 @@
 .cv-px4 { border-bottom: 3px solid #ab47bc; } .cv-px5 { border-bottom: 3px solid #26c6da; }
 .cv-px6 { border-bottom: 3px solid #d4e157; } .cv-px7 { border-bottom: 3px solid #f06292; }
 
-/* broches et barres */
+/* pins and bars */
 .cv-pins { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
 .cv-pin { font: 11px var(--mono); padding: 2px 7px; border-radius: 3px; background: var(--panel3); color: var(--muted); border: 1px solid var(--line2); }
 .cv-pin.cv-on { background: #3a3215; color: var(--active); border-color: var(--active); }
@@ -75,7 +75,7 @@
 .cv-bar.cv-warm i { background: linear-gradient(90deg, #7a5a1f, var(--active)); }
 .cv-bar span { position: relative; font: 11px var(--mono); padding-left: 6px; line-height: 18px; color: #fff; text-shadow: 0 0 3px #000; }
 
-/* vidage hexadécimal */
+/* hex dump */
 .cv-hex { margin: 0; font: 11.5px/1.5 var(--mono); color: var(--text); white-space: pre; overflow-x: auto; }
 .cv-hx-a { color: var(--addr); }
 .cv-hx-on { background: var(--active); color: #000; border-radius: 2px; }
@@ -113,7 +113,7 @@
 .cv-head { fill: #6c7787; }
 .cv-head.cv-on { fill: var(--active); }
 
-/* Gate Array : palette et décodage */
+/* Gate Array: palette and decoding */
 .cv-inks { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 5px; }
 .cv-ink { display: flex; flex-direction: column; align-items: center; background: #10151c; border: 1px solid var(--line2); border-radius: 5px; padding: 4px 2px; font: 10px var(--mono); }
 .cv-ink i { width: 26px; height: 18px; border-radius: 3px; border: 1px solid #000; margin-bottom: 2px; }
@@ -160,7 +160,7 @@
 .cv-sectors .cv-next { border-style: dashed; border-color: var(--accent); }
 .cv-sectors .cv-hot { border: 2px solid var(--active); box-shadow: 0 0 8px #ffd54f55; }
 
-/* RAM : occupation */
+/* RAM: usage */
 .cv-dens { display: flex; flex-direction: column; gap: 4px; }
 .cv-dens > div { display: flex; align-items: center; gap: 2px; }
 .cv-dens span { width: 70px; font: 11px var(--mono); color: var(--muted); }
@@ -174,12 +174,12 @@
 .cv-out.cv-hot { background: #3a3215; }
 .cv-out.cv-hot b, .cv-out.cv-hot span:first-of-type { color: var(--active); }
 
-/* imprimante */
+/* printer */
 .cv-paper { margin: 0; min-height: 60px; max-height: 220px; overflow: auto; background: #eeeadf; color: #222; font: 12px/1.45 var(--mono); padding: 8px 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all;
   background-image: repeating-linear-gradient(#eeeadf 0 17px, #dfe9df 17px 34px); }
 .cv-ctl { font-size: 9px; background: #9aa; color: #fff; border-radius: 2px; padding: 0 2px; margin: 0 1px; }
 
-/* système minimal : bascules, tampons, LED, interrupteurs */
+/* minimal system: flip-flops, buffers, LEDs, switches */
 .cv-ffs { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-bottom: 6px; }
 .cv-ff { background: #10151c; border: 1px solid var(--line2); border-radius: 5px; padding: 4px 2px; text-align: center; display: flex; flex-direction: column; gap: 2px; font: 11px var(--mono); }
 .cv-ff b { font: 600 10px var(--sans); color: var(--muted); }
@@ -193,7 +193,7 @@
 .cv-sws i::after { content: ''; position: absolute; left: 2px; right: 2px; height: 12px; bottom: 2px; background: #6c7787; border-radius: 2px; }
 .cv-sws .cv-on i::after { top: 2px; bottom: auto; background: var(--active); }
 
-/* lecteurs */
+/* drives */
 .cv-drives { display: flex; flex-wrap: wrap; gap: 12px; }
 .cv-drive { flex: 1 1 300px; display: flex; gap: 10px; align-items: flex-start; background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 8px; }
 .cv-drive.cv-hot { border-color: var(--accent); }

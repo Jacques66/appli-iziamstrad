@@ -1,11 +1,11 @@
-/* CRTC HD6845S (type 0) : compteurs de balayage, adresse vidéo MA/RA, synchros.
-   tick() avance d'un caractère (1 µs sur le CPC, soit 4 T-states du Z80). */
+/* CRTC HD6845S (type 0): scan counters, MA/RA video address, syncs.
+   tick() advances by one character (1 µs on the CPC, i.e. 4 Z80 T-states). */
 
 const MASK = [0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0x1F, 0x7F, 0x7F, 0x03, 0x1F, 0x7F, 0x1F, 0x3F, 0xFF, 0x3F, 0xFF, 0x3F, 0xFF];
 
 export class CRTC6845 {
   constructor() {
-    this.onHsyncStart = null;   // callbacks branchés par le Gate Array
+    this.onHsyncStart = null;   // callbacks wired by the Gate Array
     this.onHsyncEnd = null;
     this.onVsyncStart = null;
     this.onVsyncEnd = null;
@@ -14,13 +14,13 @@ export class CRTC6845 {
 
   reset() {
     this.regs = new Uint8Array(18);
-    // valeurs programmées par le firmware du CPC (50 Hz)
+    // values programmed by the CPC firmware (50 Hz)
     [63, 40, 46, 0x8E, 38, 0, 25, 30, 0, 7, 0, 0, 0x30, 0x00, 0, 0, 0, 0].forEach((v, i) => { this.regs[i] = v; });
     this.selected = 0;
-    this.hcc = 0;       // compteur horizontal (caractères)
-    this.vcc = 0;       // compteur de rangées de caractères
-    this.vlc = 0;       // ligne dans la rangée (RA)
-    this.rowStart = 0;  // MA du début de la rangée
+    this.hcc = 0;       // horizontal counter (characters)
+    this.vcc = 0;       // character row counter
+    this.vlc = 0;       // line within the row (RA)
+    this.rowStart = 0;  // MA at the start of the row
     this.hsync = false; this.hsyncCount = 0;
     this.vsync = false; this.vsyncCount = 0;
     this.adjust = false; this.adjustCount = 0;
@@ -35,12 +35,12 @@ export class CRTC6845 {
   }
   read() {
     const r = this.selected;
-    return r >= 14 && r <= 17 ? this.regs[r] : 0;   // type 0 : seuls R14–R17 sont lisibles
+    return r >= 14 && r <= 17 ? this.regs[r] : 0;   // type 0: only R14–R17 are readable
   }
 
   get ma() { return (this.rowStart + this.hcc) & 0x3FFF; }
   get displayEnabled() { return this.hcc < this.regs[1] && this.vcc < this.regs[6] && !this.adjust; }
-  // adresse physique (64 Ko de base) des deux octets affichés pendant ce caractère
+  // physical address (base 64 KB) of the two bytes displayed during this character
   get videoAddress() {
     const ma = this.ma;
     return ((ma & 0x3000) << 2) | ((this.vlc & 7) << 11) | ((ma & 0x3FF) << 1);

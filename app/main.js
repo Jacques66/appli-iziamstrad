@@ -15,28 +15,28 @@ import { hasChipView, renderChipView } from './chipviews.js';
 import { initCpcPanel, renderCpcPanel, pumpAudio, hostKey, releaseAllKeys } from './cpcpanel.js';
 
 /* =====================================================================
-   État
+   State
    ===================================================================== */
 const store = {
   get(k, d) { try { const v = localStorage.getItem('z80studio.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('z80studio.' + k, JSON.stringify(v)); } catch { /* stockage indisponible */ } },
+  set(k, v) { try { localStorage.setItem('z80studio.' + k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
 const MACHINES = {
-  cpc: { label: 'Amstrad CPC 6128', speed: '4000000', board: CPC_BOARD, tab: 'Machine · écran, clavier, disques' },
-  cpcfr: { label: 'Amstrad CPC 6128 français', speed: '4000000', board: CPC_BOARD, tab: 'Machine · écran, clavier AZERTY, disques' },
-  min: { label: 'Z80 minimal', speed: '4000', board: MIN_BOARD, tab: 'Machine · LED & interrupteurs' },
+  cpc: { label: 'Amstrad CPC 6128', speed: '4000000', board: CPC_BOARD, tab: 'Machine · screen, keyboard, discs' },
+  cpcfr: { label: 'Amstrad CPC 6128 French', speed: '4000000', board: CPC_BOARD, tab: 'Machine · screen, AZERTY keyboard, discs' },
+  min: { label: 'Minimal Z80', speed: '4000', board: MIN_BOARD, tab: 'Machine · LEDs & switches' },
 };
 let m = null, cpu = null;
-const cpcs = {};      // une instance par version de ROM (uk, fr), conservée d'un changement de machine à l'autre
+const cpcs = {};      // one instance per ROM version (uk, fr), kept across machine changes
 const read = a => m.read(a & 0xFFFF);
 const st = {
-  kind: store.get('machine', 'cpcfr'),
+  kind: store.get('machine', 'cpc'),
   source: '', fileName: '',
   asm: null, loaded: null,
   lineOfAddr: new Map(),
   bps: new Set(),
   running: false,
-  stopReason: 'Prêt',
+  stopReason: 'Ready',
   cur: null,
   history: [],
   instrCount: 0,
@@ -52,14 +52,14 @@ const log = (html, cls = '') => {
   c.scrollTop = c.scrollHeight;
 };
 const isCpc = () => st.kind.startsWith('cpc');
-const family = () => (isCpc() ? 'cpc' : 'min');   // programmes, exemples et points d'arrêt communs aux deux CPC
+const family = () => (isCpc() ? 'cpc' : 'min');   // programs, examples and breakpoints shared by both CPCs
 
 /* =====================================================================
-   Onglets, dock
+   Tabs, dock
    ===================================================================== */
 const lowScreen = matchMedia('(max-height: 700px)');
 const dockCollapsed = () => lowScreen.matches ? !$('.layout').classList.contains('dock-open') : $('.layout').classList.contains('dock-min');
-const dockLabel = () => { $('#dock-toggle').textContent = dockCollapsed() ? '▴ Déplier' : '▾ Replier'; };
+const dockLabel = () => { $('#dock-toggle').textContent = dockCollapsed() ? '▴ Expand' : '▾ Collapse'; };
 $('#dock-toggle').onclick = () => { $('.layout').classList.toggle(lowScreen.matches ? 'dock-open' : 'dock-min'); dockLabel(); };
 lowScreen.addEventListener('change', dockLabel);
 dockLabel();
@@ -83,7 +83,7 @@ const visible = name => $(`.pane[data-name="${name}"]`).classList.contains('acti
 async function loadRoms(lang) {
   const get = async f => {
     const r = await fetch('../roms/' + f);
-    if (!r.ok) throw new Error(`${f} introuvable (${r.status})`);
+    if (!r.ok) throw new Error(`${f} not found (${r.status})`);
     return new Uint8Array(await r.arrayBuffer());
   };
   const amsdos = await get('amsdos.rom');
@@ -94,7 +94,7 @@ async function loadRoms(lang) {
 
 async function switchMachine(kind, { keepSource = false } = {}) {
   if (!MACHINES[kind]) kind = 'cpc';
-  stop('Changement de machine');
+  stop('Machine change');
   st.kind = kind;
   store.set('machine', kind);
   $('#machine').value = kind;
@@ -102,7 +102,7 @@ async function switchMachine(kind, { keepSource = false } = {}) {
     const lang = kind === 'cpcfr' ? 'fr' : 'uk';
     if (!cpcs[lang]) {
       try { cpcs[lang] = new CPC6128(await loadRoms(lang)); }
-      catch (err) { log(`ROM du CPC indisponibles : ${esc(err.message)}. Retour au système minimal.`, 'err'); return switchMachine('min'); }
+      catch (err) { log(`CPC ROMs unavailable: ${esc(err.message)}. Falling back to the minimal system.`, 'err'); return switchMachine('min'); }
     }
     m = cpcs[lang];
     initCpcPanel(m, log);
@@ -113,7 +113,7 @@ async function switchMachine(kind, { keepSource = false } = {}) {
   $('#tab-machine').textContent = def.tab;
   $('#mach-cpc').hidden = !isCpc();
   $('#mach-min').hidden = isCpc();
-  $('[data-mem="ram"]').textContent = isCpc() ? 'Écran &C000' : 'SRAM &8000';
+  $('[data-mem="ram"]').textContent = isCpc() ? 'Screen &C000' : 'SRAM &8000';
   $('[data-mem="ram"]').dataset.addr = isCpc() ? '49152' : '32768';
   renderConfig();
   buildBoard({ board: def.board, machine: m, onSignal, onOpen });
@@ -128,12 +128,12 @@ async function switchMachine(kind, { keepSource = false } = {}) {
   hardReset();
   assembleNow();
   if (kind === 'min') loadProgram();
-  else { log('CPC 6128 : démarrage du firmware et du BASIC 1.1…'); run(); }
+  else { log('CPC 6128: starting the firmware and BASIC 1.1…'); run(); }
 }
 $('#machine').addEventListener('change', () => switchMachine($('#machine').value));
 
 /* =====================================================================
-   Éditeur
+   Editor
    ===================================================================== */
 const ta = $('#ed-ta');
 let asmTimer = null;
@@ -181,8 +181,8 @@ ta.addEventListener('input', () => {
   clearTimeout(asmTimer);
   asmTimer = setTimeout(() => {
     const res = assembleNow();
-    $('#hint').innerHTML = res.ok ? `Assemblage OK · ${size(res)} octets · F7 pour charger dans la machine`
-      : `<span class="err">${res.errors.length} erreur${res.errors.length > 1 ? 's' : ''} — ligne ${res.errors[0].line} : ${esc(res.errors[0].message)}</span>`;
+    $('#hint').innerHTML = res.ok ? `Assembly OK · ${size(res)} bytes · F7 to load into the machine`
+      : `<span class="err">${res.errors.length} error${res.errors.length > 1 ? 's' : ''} — line ${res.errors[0].line}: ${esc(res.errors[0].message)}</span>`;
   }, 350);
 });
 ta.addEventListener('keydown', e => {
@@ -212,11 +212,11 @@ $('#ed').addEventListener('mousemove', e => {
   if (!l) return;
   const d = disassemble(a => l.bytes[(a - l.addr) & 0xFFFF] ?? 0, l.addr);
   const isData = /^\s*(\S+:)?\s*(DB|DEFB|DM|DEFM|DW|DEFW|DS|DEFS)\b/i.test(l.source) || (/^\S+\s+(DB|DW|DS)\b/i.test(l.source));
-  const t = Array.isArray(d.tstates) ? `${d.tstates[0]} si saut, ${d.tstates[1]} sinon` : d.tstates;
+  const t = Array.isArray(d.tstates) ? `${d.tstates[0]} if taken, ${d.tstates[1]} otherwise` : d.tstates;
   const t0 = typeof d.tstates === 'number' ? d.tstates : d.tstates[0];
   $('#hint').innerHTML = !isData && d.mnemonic !== 'DB'
-    ? `<b>${esc(d.text)}</b> · opcode <b>${d.bytes.map(v => hex(v)).join(' ')}</b> · <b>${t} T-states</b> (${t0 / 4} µs à 4 MHz${isCpc() ? `, ${Math.ceil(t0 / 4)} NOP sur CPC` : ''}) · adresse <b>&amp;${hex(l.addr, 4)}</b>`
-    : `Données : <b>${l.bytes.length} octet${l.bytes.length > 1 ? 's' : ''}</b> à <b>&amp;${hex(l.addr, 4)}</b>`;
+    ? `<b>${esc(d.text)}</b> · opcode <b>${d.bytes.map(v => hex(v)).join(' ')}</b> · <b>${t} T-states</b> (${t0 / 4} µs at 4 MHz${isCpc() ? `, ${Math.ceil(t0 / 4)} NOPs on CPC` : ''}) · address <b>&amp;${hex(l.addr, 4)}</b>`
+    : `Data: <b>${l.bytes.length} byte${l.bytes.length > 1 ? 's' : ''}</b> at <b>&amp;${hex(l.addr, 4)}</b>`;
 });
 function toggleBp(a) {
   st.bps.has(a) ? st.bps.delete(a) : st.bps.add(a);
@@ -234,39 +234,39 @@ function setSource(src, name) {
 }
 
 /* =====================================================================
-   Chargement, exécution
+   Loading, execution
    ===================================================================== */
 function loadProgram() {
   const res = assembleNow();
   $('#console').innerHTML = '';
-  log(`<span class="cmd">&gt; assemblage de ${esc(st.fileName)}</span>`);
+  log(`<span class="cmd">&gt; assembling ${esc(st.fileName)}</span>`);
   if (!res.ok) {
-    res.errors.forEach(e => log(`ligne ${e.line} : ${esc(e.message)}`, 'err" data-line="' + e.line));
-    log(`${res.errors.length} erreur(s) : la machine n'est pas modifiée.`, 'w');
+    res.errors.forEach(e => log(`line ${e.line}: ${esc(e.message)}`, 'err" data-line="' + e.line));
+    log(`${res.errors.length} error(s): the machine is unchanged.`, 'w');
     activate('dock', 'con');
     return false;
   }
-  res.warnings.forEach(w => log(`ligne ${w.line} : avertissement — ${esc(w.message)}`, 'w'));
+  res.warnings.forEach(w => log(`line ${w.line}: warning — ${esc(w.message)}`, 'w'));
   st.loaded = res;
   st.lineOfAddr = new Map();
   res.listing.forEach(l => { if (l.bytes.length && !st.lineOfAddr.has(l.addr)) st.lineOfAddr.set(l.addr, l.line); });
   if (st.kind === 'min') {
-    stop('Programme chargé');
-    if (res.segments.some(s => s.bytes.some((_, i) => !m.chipAt(s.start + i)))) log("Attention : des octets tombent hors de l'EPROM (&0000–&1FFF) et de la SRAM (&8000–&9FFF) ; ils sont ignorés.", 'w');
+    stop('Program loaded');
+    if (res.segments.some(s => s.bytes.some((_, i) => !m.chipAt(s.start + i)))) log('Warning: some bytes fall outside the EPROM (&0000–&1FFF) and the SRAM (&8000–&9FFF); they are ignored.', 'w');
     m.load(res.segments);
-    log(`<span class="ok">✓ ${size(res)} octets assemblés, EPROM programmée, reset du processeur.</span>`);
+    log(`<span class="ok">✓ ${size(res)} bytes assembled, EPROM programmed, processor reset.</span>`);
     hardReset();
   } else {
     m.load(res.segments);
     const lo = Math.min(...res.segments.map(s => s.start)), entry = res.entry ?? lo;
-    log(`<span class="ok">✓ ${size(res)} octets injectés en RAM à partir de &amp;${hex(lo, 4)}.</span>`);
-    if (lo < 0x4000 || res.segments.some(s => s.start + s.bytes.length > 0xA67F)) log('Attention : le programme recouvre une zone utilisée par le firmware ou le BASIC (conseillé : &4000–&A67F).', 'w');
+    log(`<span class="ok">✓ ${size(res)} bytes injected into RAM from &amp;${hex(lo, 4)}.</span>`);
+    if (lo < 0x4000 || res.segments.some(s => s.start + s.bytes.length > 0xA67F)) log('Warning: the program overlaps an area used by the firmware or BASIC (recommended: &4000–&A67F).', 'w');
     if ($('#auto-call').checked) {
       m.keyboard.type(`CALL &${hex(entry, 4)}\r`);
-      log(`Frappe automatique : CALL &amp;${hex(entry, 4)}`);
+      log(`Auto-typed: CALL &amp;${hex(entry, 4)}`);
       if (!st.running) run();
       activate('ws', 'machine');
-    } else log(`Tapez CALL &amp;${hex(entry, 4)} dans le BASIC pour lancer le programme.`);
+    } else log(`Type CALL &amp;${hex(entry, 4)} in BASIC to start the program.`);
   }
   refresh(true);
   return true;
@@ -293,8 +293,8 @@ const nextIsInterrupt = () => cpu.nmiPending || (cpu.intLine && cpu.iff1 && !cpu
 function execInstr(withTrace) {
   const before = cpu.getRegs();
   let d;
-  if (nextIsInterrupt()) d = { addr: cpu.pc, bytes: [], text: cpu.nmiPending ? 'NMI → &0066' : `Interruption (IM ${cpu.im})`, mnemonic: 'INT', operands: [], tstates: 0 };
-  else if (cpu.halted) d = { addr: cpu.pc, bytes: [], text: "HALT (attente d'une interruption)", mnemonic: 'HALT', operands: [], tstates: 4 };
+  if (nextIsInterrupt()) d = { addr: cpu.pc, bytes: [], text: cpu.nmiPending ? 'NMI → &0066' : `Interrupt (IM ${cpu.im})`, mnemonic: 'INT', operands: [], tstates: 0 };
+  else if (cpu.halted) d = { addr: cpu.pc, bytes: [], text: 'HALT (waiting for an interrupt)', mnemonic: 'HALT', operands: [], tstates: 4 };
   else d = disassemble(read, cpu.pc);
   const hs = isCpc() && m.crtc.hsync, vs = isCpc() && m.crtc.vsync;
   cpu.trace = withTrace ? [] : null;
@@ -347,13 +347,13 @@ function beginInstr() {
   st.prevRegs = res.before;
 }
 function stepT() {
-  if (st.running) stop('Pas à pas');
+  if (st.running) stop('Single step');
   if (!st.cur || st.cur.k >= st.cur.steps.length - 1) beginInstr(); else st.cur.k++;
   afterStep();
 }
 function stepBackT() { if (st.cur && st.cur.k > 0) { st.cur.k--; refresh(true); } }
 function stepInstr() {
-  if (st.running) stop('Pas à pas');
+  if (st.running) stop('Single step');
   if (st.cur && st.cur.k < st.cur.steps.length - 1) st.cur.k = st.cur.steps.length - 1;
   else { beginInstr(); st.cur.k = st.cur.steps.length - 1; }
   afterStep();
@@ -361,11 +361,11 @@ function stepInstr() {
 function afterStep() {
   const c = st.cur;
   for (let j = 0; j <= c.k; j++) { if (c.steps[j].ir != null) c.inside.ir = c.steps[j].ir; if (c.steps[j].dec) c.inside.dec = c.steps[j].dec; }
-  st.stopReason = cpu.halted && c.k === c.steps.length - 1 ? "HALT : en attente d'une interruption" : 'Pas à pas';
+  st.stopReason = cpu.halted && c.k === c.steps.length - 1 ? 'HALT: waiting for an interrupt' : 'Single step';
   refresh(true);
 }
 
-/* ---------- Exécution continue ---------- */
+/* ---------- Continuous execution ---------- */
 function run() {
   if (st.running) { stop('Pause'); return; }
   if (st.kind === 'min' && !st.loaded && !loadProgram()) return;
@@ -383,7 +383,7 @@ function stop(reason) {
   if (!cpu) return;
   st.running = false;
   st.stopReason = reason;
-  $('#btn-run').innerHTML = '▶ Exécuter';
+  $('#btn-run').innerHTML = '▶ Run';
   st.cur = null;
   if (isCpc()) pumpAudio(false);
   refresh(true);
@@ -393,9 +393,9 @@ function frame(now) {
   const dt = Math.min(now - st.lastFrame, 50);
   st.lastFrame = now;
   const speed = +$('#speed').value;
-  // pendant un collage, l'émulation tourne 8 fois plus vite pour taper le texte rapidement
+  // while pasting, the emulation runs 8 times faster to type the text quickly
   const pasting = isCpc() && st.pasting && m.keyboard.typing;
-  if (st.pasting && !pasting) { st.pasting = false; log('Collage terminé.'); }
+  if (st.pasting && !pasting) { st.pasting = false; log('Paste finished.'); }
   st.budget += speed * (pasting ? 8 : 1) * dt / 1000;
   const traceAll = speed <= 4000, start = cpu.cycles;
   let hit = false;
@@ -411,10 +411,10 @@ function frame(now) {
     st.measureT = cpu.cycles; st.measureAt = now;
   }
   if (isCpc()) pumpAudio(speed === 4000000 && !pasting);
-  if (hit) { stop(`Point d'arrêt atteint à &${hex(cpu.pc, 4)}`); activate('ws', 'editor'); return; }
+  if (hit) { stop(`Breakpoint hit at &${hex(cpu.pc, 4)}`); activate('ws', 'editor'); return; }
   if (st.kind === 'min' && cpu.halted && !cpu.iff1 && !cpu.nmiPending) {
-    stop('HALT avec interruptions masquées : processeur bloqué');
-    log('HALT exécuté avec DI : seul /NMI ou /RESET peut relancer le processeur.', 'w');
+    stop('HALT with interrupts disabled: processor stuck');
+    log('HALT executed after DI: only /NMI or /RESET can restart the processor.', 'w');
     return;
   }
   refresh(false, now);
@@ -422,7 +422,7 @@ function frame(now) {
 }
 
 /* =====================================================================
-   Rendu
+   Rendering
    ===================================================================== */
 let slowTick = 0;
 function refresh(full, now = performance.now()) {
@@ -492,9 +492,9 @@ function renderRegs(r) {
     ['IX', r.IX, chg('IX')], ['IY', r.IY, chg('IY')], ['SP', r.SP, chg('SP')], ['PC', r.PC, chg('PC')],
     ['I', r.I, chg('I'), 0, 2], ['R', r.R, chg('R'), 0, 2],
   ];
-  $('#regs').innerHTML = rows.map(([n, v, c, alt, w]) => `<div class="r${c}${alt ? ' alt' : ''}" data-r="${n}" title="${n} = ${v} (décimal) · clic pour modifier"><span>${n}</span><b>${hex(v, w || 4)}</b></div>`).join('');
+  $('#regs').innerHTML = rows.map(([n, v, c, alt, w]) => `<div class="r${c}${alt ? ' alt' : ''}" data-r="${n}" title="${n} = ${v} (decimal) · click to edit"><span>${n}</span><b>${hex(v, w || 4)}</b></div>`).join('');
   $('#reg-note').textContent = st.cur ? `${st.cur.steps[st.cur.k]?.m || ''} T${st.cur.steps[st.cur.k]?.t || ''}` : '';
-  const fl = [['S', 'signe'], ['Z', 'zéro'], ['Y', 'bit 5 (non doc.)'], ['H', 'demi-retenue'], ['X', 'bit 3 (non doc.)'], ['P/V', 'parité / débordement'], ['N', 'soustraction'], ['C', 'retenue']];
+  const fl = [['S', 'sign'], ['Z', 'zero'], ['Y', 'bit 5 (undoc.)'], ['H', 'half carry'], ['X', 'bit 3 (undoc.)'], ['P/V', 'parity / overflow'], ['N', 'subtract'], ['C', 'carry']];
   $('#flags').innerHTML = fl.map(([n, d], i) => `<div class="flag${(r.F >> (7 - i)) & 1 ? ' on' : ''}" title="${d}">${n}<small>${(r.F >> (7 - i)) & 1}</small></div>`).join('');
   $('#abits').innerHTML = [...Array(8)].map((_, i) => `<span class="${(r.A >> (7 - i)) & 1 ? 'on' : ''}" title="bit ${7 - i}">${(r.A >> (7 - i)) & 1}</span>`).join('');
   $('#intr').innerHTML = `<span>IM <b>${r.IM}</b></span><span>IFF1 <b>${r.IFF1}</b></span><span>IFF2 <b>${r.IFF2}</b></span><span>HALT <b>${r.HALT}</b></span>`;
@@ -521,7 +521,7 @@ $('#regs').addEventListener('click', e => {
         if (name.endsWith("'")) { cpu.setReg(name[0] + "'", v >> 8); cpu.setReg(name[1] + "'", v & 0xFF); }
         else cpu.setReg(name, v);
         st.cur = null;
-        log(`${name} ← &${hex(v, name.length === 1 ? 2 : 4)} (modifié à la main)`);
+        log(`${name} ← &${hex(v, name.length === 1 ? 2 : 4)} (edited by hand)`);
       }
     }
     refresh(true);
@@ -530,7 +530,7 @@ $('#regs').addEventListener('click', e => {
   inp.addEventListener('blur', () => finish(true));
 });
 function renderBps() {
-  $('#bplist').innerHTML = [...st.bps].sort((a, b) => a - b).map(a => `<div data-a="${a}"><i></i>&amp;${hex(a, 4)} <em>ligne ${st.lineOfAddr.get(a) ?? '?'}</em></div>`).join('') || '<div class="muted">aucun · clic dans la marge</div>';
+  $('#bplist').innerHTML = [...st.bps].sort((a, b) => a - b).map(a => `<div data-a="${a}"><i></i>&amp;${hex(a, 4)} <em>line ${st.lineOfAddr.get(a) ?? '?'}</em></div>`).join('') || '<div class="muted">none · click in the margin</div>';
 }
 $('#bplist').addEventListener('click', e => { const d = e.target.closest('[data-a]'); if (d) toggleBp(+d.dataset.a); });
 function renderSymbols() {
@@ -559,9 +559,9 @@ function renderMem(r) {
       as += v >= 32 && v < 127 ? esc(String.fromCharCode(v)) : '·';
     }
     const chip = m.chipAt(a);
-    html += `<div class="row"><span class="a">&amp;${hex(a, 4)}</span><span class="hx">${hx}</span><span class="as">${as}</span><span class="muted">${chip === 'rom' ? 'EPROM' : chip === 'ram' ? 'SRAM' : chip || 'non câblé'}</span></div>`;
+    html += `<div class="row"><span class="a">&amp;${hex(a, 4)}</span><span class="hx">${hx}</span><span class="as">${as}</span><span class="muted">${chip === 'rom' ? 'EPROM' : chip === 'ram' ? 'SRAM' : chip || 'not wired'}</span></div>`;
   }
-  $('#mem').innerHTML = html + '<div class="gap">Légende : <span style="background:#ffd54f;color:#111;padding:0 3px">PC</span> · <span style="outline:1px solid #ffa726;color:#ffa726;padding:0 3px">(HL)</span> · <span style="outline:1px dashed #8a95a8;padding:0 3px">SP</span></div>';
+  $('#mem').innerHTML = html + '<div class="gap">Legend: <span style="background:#ffd54f;color:#111;padding:0 3px">PC</span> · <span style="outline:1px solid #ffa726;color:#ffa726;padding:0 3px">(HL)</span> · <span style="outline:1px dashed #8a95a8;padding:0 3px">SP</span></div>';
 }
 $('#mem-addr').addEventListener('change', () => refresh(true));
 $('.mem-tools').addEventListener('click', e => {
@@ -585,30 +585,30 @@ function renderDis() {
 $('#dis').addEventListener('click', e => { const tr = e.target.closest('tr[data-a]'); if (tr) toggleBp(+tr.dataset.a); });
 
 function portName(x) {
-  if (!isCpc()) return x.dir === 'out' ? (x.port & 1 ? 'aucun (A0 = 1)' : '74LS374 → LED') : (x.port & 1 ? '74LS244 ← interrupteurs' : 'aucun : bus flottant');
+  if (!isCpc()) return x.dir === 'out' ? (x.port & 1 ? 'none (A0 = 1)' : '74LS374 → LEDs') : (x.port & 1 ? '74LS244 ← switches' : 'none: floating bus');
   const p = x.port, n = [];
   if ((p & 0xC000) === 0x4000) n.push(x.value >> 6 === 3 ? 'PAL (RAM)' : 'Gate Array');
-  if (!(p & 0x4000)) n.push(['CRTC sélection', 'CRTC écriture', 'CRTC état', 'CRTC lecture'][(p >> 8) & 3]);
-  if (!(p & 0x2000)) n.push('sélection ROM haute');
-  if (!(p & 0x1000)) n.push('imprimante');
-  if (!(p & 0x0800)) n.push(['PPI A (PSG)', 'PPI B', 'PPI C', 'PPI contrôle'][(p >> 8) & 3]);
-  if (!(p & 0x0480)) n.push(p & 0x0100 ? (p & 1 ? 'FDC données' : 'FDC état') : 'moteur disquette');
-  return n.join(' + ') || 'aucun';
+  if (!(p & 0x4000)) n.push(['CRTC select', 'CRTC write', 'CRTC status', 'CRTC read'][(p >> 8) & 3]);
+  if (!(p & 0x2000)) n.push('upper ROM select');
+  if (!(p & 0x1000)) n.push('printer');
+  if (!(p & 0x0800)) n.push(['PPI A (PSG)', 'PPI B', 'PPI C', 'PPI control'][(p >> 8) & 3]);
+  if (!(p & 0x0480)) n.push(p & 0x0100 ? (p & 1 ? 'FDC data' : 'FDC status') : 'disc motor');
+  return n.join(' + ') || 'none';
 }
 function renderIO() {
   const rows = m.io.slice().reverse().slice(0, 24);
-  $('#io').innerHTML = '<table><tr><th>T-state</th><th>Sens</th><th>Port</th><th>Valeur</th><th>Circuit</th></tr>' +
-    (rows.map(x => `<tr><td class="muted">${x.t.toLocaleString('fr-FR')}</td><td>${x.dir === 'out' ? 'OUT →' : '← IN'}</td><td class="tk-n">&amp;${hex(x.port, 4)}</td><td class="tk-r">&amp;${hex(x.value)} <span class="muted">${x.value.toString(2).padStart(8, '0')}</span></td><td class="muted">${portName(x)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">aucune opération d\'E/S pour l\'instant</td></tr>') + '</table>';
+  $('#io').innerHTML = '<table><tr><th>T-state</th><th>Dir</th><th>Port</th><th>Value</th><th>Chip</th></tr>' +
+    (rows.map(x => `<tr><td class="muted">${x.t.toLocaleString('en-US')}</td><td>${x.dir === 'out' ? 'OUT →' : '← IN'}</td><td class="tk-n">&amp;${hex(x.port, 4)}</td><td class="tk-r">&amp;${hex(x.value)} <span class="muted">${x.value.toString(2).padStart(8, '0')}</span></td><td class="muted">${portName(x)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">no I/O operation yet</td></tr>') + '</table>';
 }
 
-/* ---------- Panneau de la machine minimale ---------- */
+/* ---------- Minimal machine panel ---------- */
 function renderMinPanel() {
   const leds = m.leds;
   $('#leds').innerHTML = [...Array(8)].map((_, i) => `<span class="led8${(leds >> (7 - i)) & 1 ? ' on' : ''}"><i></i>Q${7 - i}</span>`).join('');
   $('#leds-val').textContent = `&${hex(leds)} · ${leds.toString(2).padStart(8, '0')}`;
   $('#switches').innerHTML = [...Array(8)].map((_, i) => `<span class="sw8${(m.switches >> (7 - i)) & 1 ? ' on' : ''}" data-b="${7 - i}"><i></i>${7 - i}</span>`).join('');
   $('#sw-val').textContent = `&${hex(m.switches)} · ${m.switches.toString(2).padStart(8, '0')}`;
-  $('#m-state').textContent = cpu.halted ? 'Le processeur est en HALT : il exécute des NOP en attendant /INT ou /NMI.' : st.running ? 'Le processeur exécute le programme.' : "Le processeur est à l'arrêt.";
+  $('#m-state').textContent = cpu.halted ? 'The processor is in HALT: it executes NOPs while waiting for /INT or /NMI.' : st.running ? 'The processor is running the program.' : 'The processor is stopped.';
 }
 $('#switches').addEventListener('click', e => {
   const s = e.target.closest('[data-b]'); if (!s) return;
@@ -616,22 +616,22 @@ $('#switches').addEventListener('click', e => {
   refresh(true);
 });
 $('#m-reset').onclick = () => { log('/RESET'); hardReset(); };
-$('#m-nmi').onclick = () => { cpu.nmi(); log('/NMI : impulsion'); refresh(true); };
+$('#m-nmi').onclick = () => { cpu.nmi(); log('/NMI: pulse'); refresh(true); };
 const intOn = on => { cpu.irq(on); $('#m-int').classList.toggle('on', on); refresh(true); };
 $('#m-int').addEventListener('mousedown', () => intOn(true));
 $('#m-int').addEventListener('mouseup', () => intOn(false));
 $('#m-int').addEventListener('mouseleave', () => { if (cpu.intLine && st.kind === 'min') intOn(false); });
 
 function renderStatus() {
-  const state = st.running ? '<span class="st-run">▶ Exécution</span>' : `<span class="st-pause">❚❚ ${esc(st.stopReason)}</span>`;
-  const speed = st.running && st.measured ? ` · ${(st.measured / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 3 })} MHz effectifs` : '';
-  const asmTxt = st.asm ? (st.asm.ok ? `Assemblage OK · ${size(st.asm)} octets` : `${st.asm.errors.length} erreur(s)`) : '';
-  $('#status').innerHTML = `${state}<span>${MACHINES[st.kind].label} · Z80A ${speed ? speed.slice(3) : '4 MHz'}</span><span>T-states : ${cpu.cycles.toLocaleString('fr-FR')}</span><span>Instructions : ${st.instrCount.toLocaleString('fr-FR')}</span><span>PC &amp;${hex(cpu.pc, 4)}</span><span>${asmTxt}</span><span class="right">${st.caret ? `Ln ${st.caret.line}, Col ${st.caret.col} · ` : ''}${esc(st.fileName)}</span>`;
+  const state = st.running ? '<span class="st-run">▶ Running</span>' : `<span class="st-pause">❚❚ ${esc(st.stopReason)}</span>`;
+  const speed = st.running && st.measured ? ` · ${(st.measured / 1e6).toLocaleString('en-US', { maximumFractionDigits: 3 })} MHz effective` : '';
+  const asmTxt = st.asm ? (st.asm.ok ? `Assembly OK · ${size(st.asm)} bytes` : `${st.asm.errors.length} error(s)`) : '';
+  $('#status').innerHTML = `${state}<span>${MACHINES[st.kind].label} · Z80A ${speed ? speed.slice(3) : '4 MHz'}</span><span>T-states: ${cpu.cycles.toLocaleString('en-US')}</span><span>Instructions: ${st.instrCount.toLocaleString('en-US')}</span><span>PC &amp;${hex(cpu.pc, 4)}</span><span>${asmTxt}</span><span class="right">${st.caret ? `Ln ${st.caret.line}, Col ${st.caret.col} · ` : ''}${esc(st.fileName)}</span>`;
 }
 function renderConfig() {
   const cfg = isCpc()
-    ? [['Processeur', 'Z80A NMOS · 4 MHz'], ['Mémoire', '128 Ko RAM · 48 Ko ROM'], ['ROM', `OS 6128${st.kind === 'cpcfr' ? ' français' : ''} · BASIC 1.1 · AMSDOS`], ['Clavier', st.kind === 'cpcfr' ? 'AZERTY, accents é è à ç ù' : 'QWERTY'], ['Vidéo', 'Gate Array 40010 · CRTC 6845'], ['Son', 'AY-3-8912'], ['Disquettes', 'µPD765A · 2 lecteurs .DSK']]
-    : [['Processeur', 'Z80A NMOS · 4 MHz'], ['EPROM', '2764 · 8 Ko · &0000–&1FFF'], ['SRAM', '6264 · 8 Ko · &8000–&9FFF'], ['Sortie', 'port &00 → 8 LED'], ['Entrée', 'port &01 ← 8 interrupteurs']];
+    ? [['Processor', 'Z80A NMOS · 4 MHz'], ['Memory', '128 KB RAM · 48 KB ROM'], ['ROM', `OS 6128${st.kind === 'cpcfr' ? ' French' : ''} · BASIC 1.1 · AMSDOS`], ['Keyboard', st.kind === 'cpcfr' ? 'AZERTY, accents é è à ç ù' : 'QWERTY'], ['Video', 'Gate Array 40010 · CRTC 6845'], ['Sound', 'AY-3-8912'], ['Discs', 'µPD765A · 2 .DSK drives']]
+    : [['Processor', 'Z80A NMOS · 4 MHz'], ['EPROM', '2764 · 8 KB · &0000–&1FFF'], ['SRAM', '6264 · 8 KB · &8000–&9FFF'], ['Output', 'port &00 → 8 LEDs'], ['Input', 'port &01 ← 8 switches']];
   $('#config').innerHTML = cfg.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('#examples').innerHTML = EXAMPLES.map((x, i) => x.machine === family() ? `<li data-i="${i}" title="${esc(x.title)}"><span class="fi asm">ASM</span>${esc(x.name)}</li>` : '').join('');
 }
@@ -642,12 +642,12 @@ $('#examples').addEventListener('click', e => {
   activate('ws', 'editor');
 });
 
-// vue intérieure d'un circuit, rafraîchie en direct tant que la fenêtre est ouverte
+// inside view of a chip, refreshed live while the window is open
 let openChipId = null;
 function openChip(id) {
   const c = chipBlocks(id);
   openChipId = id;
-  $('#modal-title').textContent = `Intérieur : ${c.name} — ${c.sub}`;
+  $('#modal-title').textContent = `Inside: ${c.name} — ${c.sub}`;
   $('#modal').classList.add('wide');
   renderOpenChip();
   $('#modal').hidden = false;
@@ -658,14 +658,14 @@ function renderOpenChip() {
   if (hasChipView(kind, openChipId)) { $('#modal-body').innerHTML = renderChipView(kind, openChipId, m, { step }); return; }
   const c = chipBlocks(openChipId);
   $('#modal-body').innerHTML = `<div class="ib-grid">${c.blocks.map(([n, d, v]) => `<div class="ib"><b>${n}</b><span>${d}</span>${v ? `<code>${v}</code>` : ''}</div>`).join('')}</div>
-    ${c.regs.length ? `<div class="sect" style="margin-top:14px">État actuel</div><div class="ib-grid">${c.regs.map(([k, v]) => `<div class="ib"><span>${k}</span><code>${v}</code></div>`).join('')}</div>` : ''}`;
+    ${c.regs.length ? `<div class="sect" style="margin-top:14px">Current state</div><div class="ib-grid">${c.regs.map(([k, v]) => `<div class="ib"><span>${k}</span><code>${v}</code></div>`).join('')}</div>` : ''}`;
 }
 const closeChip = () => { $('#modal').hidden = true; openChipId = null; };
 $('#modal-close').onclick = closeChip;
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeChip(); });
 
 /* =====================================================================
-   Commandes
+   Commands
    ===================================================================== */
 $('#btn-asm').onclick = () => loadProgram();
 $('#btn-run').onclick = () => run();
@@ -674,12 +674,12 @@ $('#btn-tstate').onclick = $('#cpu-next').onclick = () => stepT();
 $('#cpu-prev').onclick = () => stepBackT();
 $('#btn-reset').onclick = () => {
   const wasRunning = st.running || isCpc();
-  stop('Reset'); hardReset(); log('Reset matériel.');
+  stop('Reset'); hardReset(); log('Hardware reset.');
   if (isCpc()) releaseAllKeys();
   if (wasRunning && isCpc()) run();
 };
 $('#cpu-play').onclick = e => {
-  if (st.playTimer) { clearInterval(st.playTimer); st.playTimer = null; e.target.classList.remove('on'); e.target.textContent = '▶ Animer'; return; }
+  if (st.playTimer) { clearInterval(st.playTimer); st.playTimer = null; e.target.classList.remove('on'); e.target.textContent = '▶ Animate'; return; }
   e.target.classList.add('on'); e.target.textContent = '❚❚ Pause';
   st.playTimer = setInterval(stepT, 900);
 };
@@ -691,12 +691,12 @@ function download(name, blob) {
 $('#btn-save').onclick = () => download(st.fileName, new Blob([st.source], { type: 'text/plain' }));
 $('#btn-bin').onclick = () => {
   const res = st.asm?.ok ? st.asm : assembleNow();
-  if (!res.ok) { log('Le source contient des erreurs : rien à exporter.', 'w'); activate('dock', 'con'); return; }
+  if (!res.ok) { log('The source has errors: nothing to export.', 'w'); activate('dock', 'con'); return; }
   const lo = Math.min(...res.segments.map(s => s.start)), hi = Math.max(...res.segments.map(s => s.start + s.bytes.length));
   const out = new Uint8Array(hi - lo);
   res.segments.forEach(s => out.set(s.bytes, s.start - lo));
   download(st.fileName.replace(/\.\w+$/, '') + '.bin', new Blob([out], { type: 'application/octet-stream' }));
-  log(`Exporté : ${out.length} octets à partir de &${hex(lo, 4)}.`);
+  log(`Exported: ${out.length} bytes from &${hex(lo, 4)}.`);
 };
 $('#btn-open').onclick = () => $('#file-in').click();
 $('#file-in').addEventListener('change', async e => {
@@ -705,12 +705,12 @@ $('#file-in').addEventListener('change', async e => {
   e.target.value = '';
 });
 
-// un menu, une case à cocher ou un bouton qui garde le focus ne doit pas capter la frappe
+// a menu, checkbox or button that keeps the focus must not capture typing
 const isTextField = el => !!el && el.offsetParent !== null &&
   (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|number|search)$/.test(el.type)));
-// AltGr (| # @ [ ] { } \ ` ^ sur AZERTY) arrive sous Windows comme Ctrl+Alt : ce n'est pas un raccourci
+// AltGr (| # @ [ ] { } \ ` ^ on AZERTY) arrives as Ctrl+Alt on Windows: it is not a shortcut
 const altGr = e => e.getModifierState?.('AltGraph') || (e.ctrlKey && e.altKey);
-// le clavier va toujours au CPC (plein écran compris), sauf sur l'onglet Éditeur et dans un champ de saisie visible
+// the keyboard always goes to the CPC (full screen included), except on the Editor tab and in a visible text field
 const toCpc = e => isCpc() && (!!document.fullscreenElement || (!visible('editor') && !isTextField(e.target))) &&
   (!e.ctrlKey || e.key === 'Control' || altGr(e)) && !/^F\d+$/.test(e.key);
 const focusScreen = () => { if (isCpc() && visible('machine')) $('#crt').focus({ preventScroll: true }); };
@@ -730,34 +730,34 @@ document.addEventListener('keydown', e => {
   else if (e.ctrlKey && k.toLowerCase() === 'r') { e.preventDefault(); $('#btn-reset').click(); }
 });
 document.addEventListener('keyup', e => { if (isCpc() && hostKey(e, false)) e.preventDefault(); });
-// Ctrl+V : le texte du presse-papiers est tapé dans le CPC (programme BASIC, commandes…)
+// Ctrl+V: the clipboard text is typed into the CPC (BASIC program, commands…)
 document.addEventListener('paste', e => {
   const fake = { target: e.target, ctrlKey: false, key: 'v' };
   if (!toCpc(fake)) return;
   e.preventDefault();
   const text = e.clipboardData?.getData('text/plain') || '';
   if (!text) return;
-  // le Ctrl de Ctrl+V a pu être vu par le firmware : on relâche tout et on attend 6 trames,
-  // sinon le premier caractère serait tapé comme CTRL+caractère
+  // the firmware may have seen the Ctrl of Ctrl+V: release everything and wait 6 frames,
+  // otherwise the first character would be typed as CTRL+character
   releaseAllKeys();
   m.keyboard.pause(6);
   const skipped = m.keyboard.type(text);
   st.pasting = true;
   if (!st.running) run();
   const n = text.length - skipped;
-  log(`Collage dans le CPC : ${n} caractères${skipped ? `, ${skipped} ignorés (absents du clavier du CPC)` : ''} — frappe accélérée en cours.`, skipped ? 'w' : '');
+  log(`Pasting into the CPC: ${n} characters${skipped ? `, ${skipped} skipped (not on the CPC keyboard)` : ''} — fast typing in progress.`, skipped ? 'w' : '');
 });
 window.addEventListener('blur', () => { if (isCpc()) releaseAllKeys(); });
 $('#crt').addEventListener('click', () => $('#crt').focus());
-// après un réglage du moniteur, le focus revient à l'écran
+// after a monitor setting change, the focus goes back to the screen
 $$('#mach-cpc .mon-tools select, #mach-cpc .mon-tools input, #mach-cpc .mon-tools button').forEach(el => el.addEventListener('change', focusScreen));
 $('#btn-copytext').addEventListener('click', focusScreen);
 
 /* =====================================================================
-   Démarrage
+   Startup
    ===================================================================== */
 buildCPU();
 initBoardEvents();
 switchMachine(st.kind);
-// accès depuis la console du navigateur (débogage, tests)
+// access from the browser console (debugging, tests)
 window.z80studio = { get machine() { return m; }, get state() { return st; } };

@@ -1,13 +1,12 @@
-/* Z80 Studio — assembleur Z80.
-   Syntaxe proche de Maxam / WinAPE / pasmo : labels en colonne 0 (deux-points
-   facultatif), nombres &FF #FF $FF 0xFF 0FFh %1010 0b1010, directives ORG EQU
-   DB DW DS ALIGN END INCLUDE. Jeu d'instructions complet, y compris les formes
-   non documentées (IXH/IXL/IYH/IYL, SLL, DDCB à registre de copie, IN F,(C),
+/* Z80 Studio — Z80 assembler.
+   Syntax close to Maxam / WinAPE / pasmo: labels in column 0 (colon
+   optional), numbers &FF #FF $FF 0xFF 0FFh %1010 0b1010, directives ORG EQU
+   DB DW DS ALIGN END INCLUDE. Full instruction set, including the
+   undocumented forms (IXH/IXL/IYH/IYL, SLL, DDCB with copy register, IN F,(C),
    OUT (C),0).
-   Assemblage en passes successives : chaque passe réutilise les symboles de la
-   précédente pour les références en avant ; on s'arrête quand la table des
-   symboles ne change plus, et seuls les diagnostics de la dernière passe sont
-   rendus. */
+   Multi-pass assembly: each pass reuses the symbols of the previous one for
+   forward references; it stops when the symbol table no longer changes, and
+   only the diagnostics of the last pass are returned. */
 
 class AsmError extends Error {}
 
@@ -55,7 +54,7 @@ const MNEMONICS = new Set([
 ]);
 
 /* =====================================================================
-   Analyse lexicale
+   Lexical analysis
    ===================================================================== */
 const isDigit = c => c >= '0' && c <= '9';
 const isHexDigit = c => /^[0-9A-Fa-f]$/.test(c);
@@ -69,15 +68,15 @@ function parseNumber(w) {
   if (/^0[bB][01]+$/.test(w)) return parseInt(w.slice(2), 2);
   if (/^[01]+[bB]$/.test(w)) return parseInt(w.slice(0, -1), 2);
   if (/^[0-9]+$/.test(w)) return parseInt(w, 10);
-  throw new AsmError(`nombre invalide : ${w}`);
+  throw new AsmError(`invalid number: ${w}`);
 }
 
-// Jetons : { t: 'id'|'num'|'str'|'pc'|'op', v, s, e, raw }
+// Tokens: { t: 'id'|'num'|'str'|'pc'|'op', v, s, e, raw }
 function tokenize(text) {
   const toks = [];
   const n = text.length;
-  // Vrai si un opérande est attendu (début, après un opérateur, une instruction ou une directive) :
-  // sert à lire & et % comme préfixes de nombre plutôt que comme opérateurs.
+  // True if an operand is expected (start, after an operator, an instruction or a directive):
+  // used to read & and % as number prefixes rather than as operators.
   const expectValue = () => {
     const last = toks[toks.length - 1];
     if (!last) return true;
@@ -97,7 +96,7 @@ function tokenize(text) {
   const prefixed = (s, radix, valid) => {
     const e = wordEnd(s + 1);
     const digits = text.slice(s + 1, e);
-    if (!valid.test(digits)) throw new AsmError(`nombre invalide : ${text.slice(s, e)}`);
+    if (!valid.test(digits)) throw new AsmError(`invalid number: ${text.slice(s, e)}`);
     push('num', parseInt(digits, radix), s, e);
     return e;
   };
@@ -109,7 +108,7 @@ function tokenize(text) {
     const s = i;
     if (c === '"' || c === "'") {
       const j = text.indexOf(c, i + 1);
-      if (j < 0) throw new AsmError('chaîne non terminée');
+      if (j < 0) throw new AsmError('unterminated string');
       push('str', text.slice(i + 1, j), s, j + 1);
       i = j + 1;
     } else if (isDigit(c)) {
@@ -129,7 +128,7 @@ function tokenize(text) {
       let j = i + 1;
       while (j < n && isIdChar(text[j])) j++;
       let v = text.slice(i, j);
-      // AF' : l'apostrophe fait partie du nom de registre, ce n'est pas une chaîne.
+      // AF': the apostrophe is part of the register name, not a string.
       if (v.toUpperCase() === 'AF' && text[j] === "'") { j++; v = "AF'"; }
       push('id', v, s, j);
       i = j;
@@ -140,7 +139,7 @@ function tokenize(text) {
       push('op', c, s, i + 1);
       i++;
     } else {
-      throw new AsmError(`caractère inattendu : ${c}`);
+      throw new AsmError(`unexpected character: ${c}`);
     }
   }
   return toks;
@@ -149,15 +148,15 @@ function tokenize(text) {
 const isOp = (t, v) => t && t.t === 'op' && t.v === v;
 
 /* =====================================================================
-   Expressions (priorités du C)
+   Expressions (C precedence)
    ===================================================================== */
 const PREC = { '|': 1, '^': 2, '&': 3, '<<': 4, '>>': 4, '+': 5, '-': 5, '*': 6, '/': 6, '%': 6 };
 
 function evaluate(toks, env) {
-  if (!toks.length) throw new AsmError('expression manquante');
+  if (!toks.length) throw new AsmError('missing expression');
   const p = { toks, i: 0, env };
   const v = parseBinary(p, 1);
-  if (p.i < toks.length) throw new AsmError(`expression invalide : « ${toks[p.i].raw} » inattendu`);
+  if (p.i < toks.length) throw new AsmError(`invalid expression: unexpected '${toks[p.i].raw}'`);
   return v;
 }
 
@@ -178,10 +177,10 @@ function applyOp(op, a, b, env) {
     case '-': return a - b;
     case '*': return a * b;
     case '/':
-      if (b === 0) { env.valueError('division par zéro'); return 0; }
+      if (b === 0) { env.valueError('division by zero'); return 0; }
       return Math.trunc(a / b);
     case '%':
-      if (b === 0) { env.valueError('modulo par zéro'); return 0; }
+      if (b === 0) { env.valueError('modulo by zero'); return 0; }
       return a % b;
     case '&': return a & b;
     case '|': return a | b;
@@ -189,7 +188,7 @@ function applyOp(op, a, b, env) {
     case '<<': return a << b;
     case '>>': return a >> b;
   }
-  throw new AsmError(`opérateur inconnu : ${op}`);
+  throw new AsmError(`unknown operator: ${op}`);
 }
 
 function parseUnary(p) {
@@ -202,38 +201,38 @@ function parseUnary(p) {
 
 function parsePrimary(p) {
   const t = p.toks[p.i++];
-  if (!t) throw new AsmError('expression incomplète');
+  if (!t) throw new AsmError('incomplete expression');
   switch (t.t) {
     case 'num': return t.v;
     case 'pc': return p.env.pc;
     case 'str':
-      if (t.v.length !== 1) throw new AsmError(`une chaîne dans une expression doit faire un caractère : ${t.raw}`);
+      if (t.v.length !== 1) throw new AsmError(`a string in an expression must be one character: ${t.raw}`);
       return t.v.charCodeAt(0);
     case 'id': return p.env.symbol(t.v);
   }
   if (isOp(t, '(')) {
     const v = parseBinary(p, 1);
-    if (!isOp(p.toks[p.i], ')')) throw new AsmError('parenthèse fermante manquante');
+    if (!isOp(p.toks[p.i], ')')) throw new AsmError('missing closing parenthesis');
     p.i++;
     return v;
   }
-  throw new AsmError(`expression invalide : « ${t.raw} » inattendu`);
+  throw new AsmError(`invalid expression: unexpected '${t.raw}'`);
 }
 
 function byte(v, env) {
-  if (v < -128 || v > 255) env.warn(`valeur hors limites pour un octet : ${v} (tronquée à ${hex(v & 0xFF)})`);
+  if (v < -128 || v > 255) env.warn(`value out of range for a byte: ${v} (truncated to ${hex(v & 0xFF)})`);
   return v & 0xFF;
 }
 
 function word(v, env) {
-  if (v < -32768 || v > 65535) env.warn(`valeur hors limites pour un mot : ${v} (tronquée à ${hex(v & 0xFFFF, 4)})`);
+  if (v < -32768 || v > 65535) env.warn(`value out of range for a word: ${v} (truncated to ${hex(v & 0xFFFF, 4)})`);
   return [v & 0xFF, (v >> 8) & 0xFF];
 }
 
 /* =====================================================================
-   Opérandes
+   Operands
    ===================================================================== */
-// Découpe aux virgules de niveau 0.
+// Split at top-level commas.
 function splitOperands(toks) {
   const ops = [];
   let cur = [], depth = 0;
@@ -243,11 +242,11 @@ function splitOperands(toks) {
     if (isOp(t, ',') && depth === 0) { ops.push(cur); cur = []; } else cur.push(t);
   }
   ops.push(cur);
-  if (ops.some(o => !o.length)) throw new AsmError('opérande manquant');
+  if (ops.some(o => !o.length)) throw new AsmError('missing operand');
   return ops;
 }
 
-// Indice de la parenthèse fermante associée à toks[0].
+// Index of the closing parenthesis matching toks[0].
 function closingParen(toks) {
   let depth = 0;
   for (let k = 0; k < toks.length; k++) {
@@ -257,8 +256,8 @@ function closingParen(toks) {
   return -1;
 }
 
-/* Types : reg (registre), imm (valeur), mem ((expr)), ind ((HL) (BC) (DE) (SP) (C)),
-   idx ((IX+d), (IY-d), (IX) ; dispToks vaut null pour la forme sans déplacement). */
+/* Kinds: reg (register), imm (value), mem ((expr)), ind ((HL) (BC) (DE) (SP) (C)),
+   idx ((IX+d), (IY-d), (IX); dispToks is null for the form without displacement). */
 function parseOperand(toks, text) {
   const op = { toks, text: text.slice(toks[0].s, toks[toks.length - 1].e).trim(), word: null };
   if (toks.length === 1 && toks[0].t === 'id') {
@@ -266,23 +265,23 @@ function parseOperand(toks, text) {
     op.word = up;
     if (REGISTERS.has(up)) return { ...op, kind: 'reg', reg: HALF_ALIAS[up] ?? up };
   }
-  // Accès mémoire seulement si les parenthèses extérieures englobent tout l'opérande.
+  // Memory access only if the outer parentheses enclose the whole operand.
   if (isOp(toks[0], '(') && closingParen(toks) === toks.length - 1) {
     const inner = toks.slice(1, -1);
-    if (!inner.length) throw new AsmError(`opérande invalide : ${op.text}`);
+    if (!inner.length) throw new AsmError(`invalid operand: ${op.text}`);
     const first = inner[0].t === 'id' ? inner[0].v.toUpperCase() : null;
     if (inner.length === 1 && ['HL', 'BC', 'DE', 'SP', 'C'].includes(first)) return { ...op, kind: 'ind', reg: first };
     if (first === 'IX' || first === 'IY') {
       if (inner.length === 1) return { ...op, kind: 'idx', reg: first, dispToks: null };
       if (isOp(inner[1], '+') || isOp(inner[1], '-')) return { ...op, kind: 'idx', reg: first, dispToks: inner.slice(1) };
-      throw new AsmError(`opérande invalide : ${op.text}`);
+      throw new AsmError(`invalid operand: ${op.text}`);
     }
     return { ...op, kind: 'mem', expr: inner };
   }
   return { ...op, kind: 'imm', expr: toks };
 }
 
-// Opérande 8 bits : registre simple, moitié d'index, (HL) ou (IX+d).
+// 8-bit operand: plain register, index half, (HL) or (IX+d).
 function r8(op) {
   if (op.kind === 'reg') {
     if (op.reg in REG8) return { code: REG8[op.reg], prefix: 0 };
@@ -294,12 +293,12 @@ function r8(op) {
   return null;
 }
 
-// Préfixe commun à deux opérandes 8 bits (0 si aucun), null si la combinaison est impossible.
+// Prefix shared by two 8-bit operands (0 if none), null if the combination is impossible.
 function pairPrefix(a, b) {
   if (a.code === 6 && b.code === 6) return null;
   if (a.prefix && b.prefix && a.prefix !== b.prefix) return null;
   if (a.half || b.half) {
-    // Sous préfixe DD/FD, H et L désignent déjà IXH/IXL : pas de mélange avec H, L, (HL) ou (IX+d).
+    // Under a DD/FD prefix, H and L already mean IXH/IXL: no mixing with H, L, (HL) or (IX+d).
     const other = a.half ? b : a;
     if (!other.half && other.code >= 4 && other.code <= 6) return null;
   }
@@ -307,13 +306,13 @@ function pairPrefix(a, b) {
 }
 
 /* =====================================================================
-   Encodage des instructions
+   Instruction encoding
    ===================================================================== */
 function encode(mn, ops, env) {
   const bad = () => {
     throw new AsmError(ops.length
-      ? `opérande invalide pour ${mn} : ${ops.map(o => o.text).join(',')}`
-      : `opérande manquant pour ${mn}`);
+      ? `invalid operand for ${mn}: ${ops.map(o => o.text).join(',')}`
+      : `missing operand for ${mn}`);
   };
   const count = (...allowed) => { if (!allowed.includes(ops.length)) bad(); };
   const isReg = (op, name) => op.kind === 'reg' && op.reg === name;
@@ -323,16 +322,16 @@ function encode(mn, ops, env) {
   const disp = idx => {
     if (!idx.dispToks) return 0;
     const v = evaluate(idx.dispToks, env);
-    if (v < -128 || v > 127) env.valueError(`déplacement hors limites (${v})`);
+    if (v < -128 || v > 127) env.valueError(`displacement out of range (${v})`);
     return v & 0xFF;
   };
-  // [préfixe] opcode [déplacement]
+  // [prefix] opcode [displacement]
   const pre = (r, opcode) => {
     const b = r.prefix ? [r.prefix, opcode] : [opcode];
     if (r.idx) b.push(disp(r.idx));
     return b;
   };
-  // CB op ou DD CB d op
+  // CB op or DD CB d op
   const cb = (r, opcode) => r.idx ? [r.prefix, 0xCB, disp(r.idx), opcode] : [0xCB, opcode];
   const cond = op => {
     if (isReg(op, 'C')) return COND.C;
@@ -341,10 +340,10 @@ function encode(mn, ops, env) {
   };
   const rel = op => {
     const off = val(op) - (env.pc + 2);
-    if (off < -128 || off > 127) env.valueError(`saut relatif hors de portée (${off})`);
+    if (off < -128 || off > 127) env.valueError(`relative jump out of range (${off})`);
     return off & 0xFF;
   };
-  // Registre simple utilisable par IN r,(C) / OUT (C),r et comme registre de copie DDCB.
+  // Plain register usable by IN r,(C) / OUT (C),r and as the DDCB copy register.
   const plain = op => {
     const r = r8(op);
     return r && !r.prefix && r.code !== 6 ? r : null;
@@ -404,7 +403,7 @@ function encode(mn, ops, env) {
       code = c.code;
     }
     let b = val(ops[0]);
-    if (b < 0 || b > 7) { env.valueError(`numéro de bit invalide : ${b}`); b &= 7; }
+    if (b < 0 || b > 7) { env.valueError(`invalid bit number: ${b}`); b &= 7; }
     return cb(r, BITOP[mn] | b << 3 | code);
   }
 
@@ -519,7 +518,7 @@ function encode(mn, ops, env) {
       }
       const cc = cond(ops[0]);
       if (cc === null || ops[1].kind !== 'imm') bad();
-      if (cc > 3) throw new AsmError(`condition non permise avec JR : ${ops[0].text}`);
+      if (cc > 3) throw new AsmError(`condition not allowed with JR: ${ops[0].text}`);
       return [0x20 | cc << 3, rel(ops[1])];
     }
     case 'DJNZ':
@@ -532,7 +531,7 @@ function encode(mn, ops, env) {
       const v = val(ops[0]);
       if (v >= 0 && v <= 0x38 && v % 8 === 0) return [0xC7 | v];
       if (v >= 0 && v <= 7) return [0xC7 | v << 3];
-      env.valueError(`adresse RST invalide : ${hex(v)}`);
+      env.valueError(`invalid RST address: ${hex(v)}`);
       return [0xC7];
     }
     case 'IM': {
@@ -540,7 +539,7 @@ function encode(mn, ops, env) {
       if (ops[0].kind !== 'imm') bad();
       const v = val(ops[0]);
       const code = { 0: 0x46, 1: 0x56, 2: 0x5E }[v];
-      if (code === undefined) { env.valueError(`mode d'interruption invalide : ${v}`); return [0xED, 0x46]; }
+      if (code === undefined) { env.valueError(`invalid interrupt mode: ${v}`); return [0xED, 0x46]; }
       return [0xED, code];
     }
     case 'IN': {
@@ -567,14 +566,14 @@ function encode(mn, ops, env) {
         if (r) return [0xED, 0x41 | r.code << 3];
         if (s.kind === 'imm') {
           const v = val(s);
-          if (v !== 0) env.valueError(`seule la valeur 0 est permise dans OUT (C),n : ${v}`);
+          if (v !== 0) env.valueError(`only the value 0 is allowed in OUT (C),n: ${v}`);
           return [0xED, 0x71];
         }
       }
       return bad();
     }
   }
-  throw new AsmError(`instruction inconnue : ${mn}`);
+  throw new AsmError(`unknown instruction: ${mn}`);
 }
 
 /* =====================================================================
@@ -584,17 +583,17 @@ const splitLines = text => text.split(/\r\n|\r|\n/);
 
 function lookup(st, name) {
   const up = name.toUpperCase();
-  if (REGISTERS.has(up)) throw new AsmError(`registre inattendu dans une expression : ${up}`);
+  if (REGISTERS.has(up)) throw new AsmError(`unexpected register in an expression: ${up}`);
   if (st.symbols.has(up)) return st.symbols.get(up);
   if (st.prev && st.prev.has(up)) return st.prev.get(up);
   return undefined;
 }
 
-// value === null : EQU dont la valeur dépend d'un symbole encore inconnu.
+// value === null: EQU whose value depends on a symbol not yet known.
 function define(st, tok, value, env) {
   const name = tok.v.toUpperCase();
-  if (RESERVED.has(name)) { env.error(`nom réservé, ne peut pas servir de symbole : ${tok.v}`); return; }
-  if (st.symbols.has(name) || st.pending.has(name)) { env.error(`symbole déjà défini : ${name}`); return; }
+  if (RESERVED.has(name)) { env.error(`reserved name, cannot be used as a symbol: ${tok.v}`); return; }
+  if (st.symbols.has(name) || st.pending.has(name)) { env.error(`symbol already defined: ${name}`); return; }
   if (value === null) st.pending.add(name);
   else st.symbols.set(name, value);
 }
@@ -604,7 +603,7 @@ function emit(st, bytes, env, line) {
   let n = bytes.length;
   if (!n) return bytes;
   if (start + n > 0x10000) {
-    if (!st.overflow) env.error(`le code dépasse l'adresse &FFFF`);
+    if (!st.overflow) env.error(`code goes past address &FFFF`);
     st.overflow = true;
     n = Math.max(0, 0x10000 - start);
   }
@@ -622,7 +621,7 @@ function emit(st, bytes, env, line) {
       st.owner[a] = line;
       seg.data.push(bytes[k]);
     }
-    if (overlap) env.warn(`chevauchement : la ligne ${overlap} a déjà placé du code à cette adresse`);
+    if (overlap) env.warn(`overlap: line ${overlap} already placed code at this address`);
   }
   st.pc = start + bytes.length;
   return n === bytes.length ? bytes : bytes.slice(0, n);
@@ -630,17 +629,17 @@ function emit(st, bytes, env, line) {
 
 function loadInclude(st, name) {
   const include = st.options.include;
-  if (typeof include !== 'function') throw new AsmError(`INCLUDE impossible : aucun accès aux fichiers pour « ${name} »`);
+  if (typeof include !== 'function') throw new AsmError(`INCLUDE failed: no file access for '${name}'`);
   if (!st.includeCache.has(name)) {
     try {
       const text = include(name);
-      st.includeCache.set(name, text == null ? { error: 'fichier introuvable' } : { text: String(text) });
+      st.includeCache.set(name, text == null ? { error: 'file not found' } : { text: String(text) });
     } catch (e) {
       st.includeCache.set(name, { error: e && e.message ? e.message : String(e) });
     }
   }
   const entry = st.includeCache.get(name);
-  if (entry.error) throw new AsmError(`INCLUDE impossible : ${name} (${entry.error})`);
+  if (entry.error) throw new AsmError(`INCLUDE failed: ${name} (${entry.error})`);
   return entry.text;
 }
 
@@ -649,8 +648,8 @@ function processLine(st, text, env, where) {
   const none = { addr: null, bytes: [] };
   if (!toks.length) return none;
 
-  // Label : identifiant suivi de « : », nom avant EQU / =, ou identifiant en colonne 0
-  // qui n'est ni une instruction ni une directive.
+  // Label: identifier followed by ':', name before EQU / =, or identifier in column 0
+  // that is neither an instruction nor a directive.
   let i = 0, label = null;
   const first = toks[0], next = toks[1];
   if (first.t === 'id') {
@@ -669,13 +668,13 @@ function processLine(st, text, env, where) {
   let mn;
   if (isOp(head, '=')) mn = 'EQU';
   else if (head.t === 'id') mn = head.v.toUpperCase();
-  else throw new AsmError(`instruction attendue : ${head.raw}`);
+  else throw new AsmError(`instruction expected: ${head.raw}`);
   const rest = toks.slice(i + 1);
   const operands = () => rest.length ? splitOperands(rest) : [];
 
   if (mn === 'EQU') {
-    if (!label) throw new AsmError('EQU sans nom de symbole');
-    if (!rest.length) throw new AsmError('valeur manquante pour EQU');
+    if (!label) throw new AsmError('EQU without a symbol name');
+    if (!rest.length) throw new AsmError('missing value for EQU');
     const v = evaluate(rest, env);
     define(st, label, env.undef.size ? null : v, env);
     return none;
@@ -683,9 +682,9 @@ function processLine(st, text, env, where) {
 
   if (mn === 'ORG') {
     const ops = operands();
-    if (ops.length !== 1) throw new AsmError('ORG attend une adresse');
+    if (ops.length !== 1) throw new AsmError('ORG expects an address');
     const v = evaluate(ops[0], env);
-    if (v < 0 || v > 0xFFFF) env.valueError(`adresse ORG hors limites : ${v}`);
+    if (v < 0 || v > 0xFFFF) env.valueError(`ORG address out of range: ${v}`);
     st.pc = v & 0xFFFF;
     st.overflow = false;
     if (label) define(st, label, st.pc, env);
@@ -702,7 +701,7 @@ function processLine(st, text, env, where) {
   switch (mn) {
     case 'DB': case 'DEFB': case 'DM': case 'DEFM': {
       const ops = operands();
-      if (!ops.length) throw new AsmError(`valeur manquante pour ${mn}`);
+      if (!ops.length) throw new AsmError(`missing value for ${mn}`);
       const bytes = [];
       for (const op of ops) {
         if (op.length === 1 && op[0].t === 'str') {
@@ -715,25 +714,25 @@ function processLine(st, text, env, where) {
     }
     case 'DW': case 'DEFW': {
       const ops = operands();
-      if (!ops.length) throw new AsmError(`valeur manquante pour ${mn}`);
+      if (!ops.length) throw new AsmError(`missing value for ${mn}`);
       const bytes = [];
       for (const op of ops) bytes.push(...word(evaluate(op, env), env));
       return result(bytes);
     }
     case 'DS': case 'DEFS': {
       const ops = operands();
-      if (ops.length < 1 || ops.length > 2) throw new AsmError(`${mn} attend une taille et éventuellement un octet de remplissage`);
+      if (ops.length < 1 || ops.length > 2) throw new AsmError(`${mn} expects a size and optionally a fill byte`);
       let n = evaluate(ops[0], env);
       const fill = ops.length === 2 ? byte(evaluate(ops[1], env), env) : 0;
-      if (n < 0 || n > 0x10000) { env.valueError(`taille invalide pour ${mn} : ${n}`); n = 0; }
+      if (n < 0 || n > 0x10000) { env.valueError(`invalid size for ${mn}: ${n}`); n = 0; }
       return result(new Array(n).fill(fill));
     }
     case 'ALIGN': {
       const ops = operands();
-      if (ops.length < 1 || ops.length > 2) throw new AsmError('ALIGN attend un alignement et éventuellement un octet de remplissage');
+      if (ops.length < 1 || ops.length > 2) throw new AsmError('ALIGN expects an alignment and optionally a fill byte');
       const n = evaluate(ops[0], env);
       const fill = ops.length === 2 ? byte(evaluate(ops[1], env), env) : 0;
-      if (n < 1 || n > 0x10000) { env.valueError(`alignement invalide : ${n}`); return result([]); }
+      if (n < 1 || n > 0x10000) { env.valueError(`invalid alignment: ${n}`); return result([]); }
       return result(new Array((n - st.pc % n) % n).fill(fill));
     }
     case 'END': {
@@ -745,11 +744,11 @@ function processLine(st, text, env, where) {
       return { addr: labelAddr, bytes: [] };
     }
     case 'INCLUDE': {
-      if (rest.length !== 1 || rest[0].t !== 'str') throw new AsmError('INCLUDE attend un nom de fichier entre guillemets');
+      if (rest.length !== 1 || rest[0].t !== 'str') throw new AsmError('INCLUDE expects a quoted file name');
       const name = rest[0].v;
-      if (where.depth >= MAX_INCLUDE_DEPTH) throw new AsmError(`INCLUDE trop imbriqués : ${name}`);
+      if (where.depth >= MAX_INCLUDE_DEPTH) throw new AsmError(`INCLUDE nested too deeply: ${name}`);
       const content = loadInclude(st, name);
-      // Le code inclus est attribué à la ligne INCLUDE dans le listing.
+      // Included code is attributed to the INCLUDE line in the listing.
       const agg = { addr: null, bytes: [] };
       splitLines(content).forEach((t, k) => {
         if (st.ended) return;
@@ -762,7 +761,7 @@ function processLine(st, text, env, where) {
     }
   }
 
-  if (!MNEMONICS.has(mn)) throw new AsmError(`instruction inconnue : ${head.v}`);
+  if (!MNEMONICS.has(mn)) throw new AsmError(`unknown instruction: ${head.v}`);
   const ops = operands().map(t => parseOperand(t, text));
   return result(encode(mn, ops, env));
 }
@@ -788,13 +787,13 @@ function assembleLine(st, text, where) {
     if (!(e instanceof AsmError)) throw e;
     diag.errors.push({ message: e.message, value: false });
   }
-  // Un symbole inconnu rend les contrôles de valeur sans objet : on ne garde que lui.
+  // An unknown symbol makes the value checks meaningless: keep only that error.
   let errors = diag.errors, warnings = diag.warnings;
   if (diag.undef.size) {
-    errors = [...[...diag.undef].map(n => ({ message: `symbole inconnu : ${n}` })), ...errors.filter(e => !e.value)];
+    errors = [...[...diag.undef].map(n => ({ message: `unknown symbol: ${n}` })), ...errors.filter(e => !e.value)];
     warnings = [];
   }
-  const prefix = where.file ? `${where.file}, ligne ${where.fileLine} : ` : '';
+  const prefix = where.file ? `${where.file}, line ${where.fileLine}: ` : '';
   for (const e of errors) st.errors.push({ line: where.line, message: prefix + e.message });
   for (const w of warnings) st.warnings.push({ line: where.line, message: prefix + w });
   return res;
@@ -836,7 +835,7 @@ export function assemble(source, options = {}) {
     prev = st.symbols;
   }
   const errors = st.errors;
-  if (!stable) errors.push({ line: 1, message: 'les valeurs des symboles ne se stabilisent pas (définitions circulaires ?)' });
+  if (!stable) errors.push({ line: 1, message: 'symbol values do not settle (circular definitions?)' });
   return {
     ok: errors.length === 0,
     errors,

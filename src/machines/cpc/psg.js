@@ -1,30 +1,30 @@
-/* Générateur de son General Instrument AY-3-8912 (PSG) tel que monté sur l'Amstrad CPC 6128.
-   Horloge 1 MHz (Z80 à 4 MHz). Le PSG n'est pas sur le bus du CPU : son bus de données
-   est relié au port A du PPI 8255, BDIR/BC1 aux bits 7/6 du port C. Le port d'E/S A
-   (registre 14) lit les colonnes du clavier.
+/* General Instrument AY-3-8912 sound generator (PSG) as fitted in the Amstrad CPC 6128.
+   1 MHz clock (Z80 at 4 MHz). The PSG is not on the CPU bus: its data bus
+   is wired to port A of the PPI 8255, BDIR/BC1 to bits 7/6 of port C. I/O port A
+   (register 14) reads the keyboard columns.
 
-   Modélisation : le circuit avance par pas de 8 périodes d'horloge (125 kHz sur le CPC).
-   - tonalité : compteur incrémenté à chaque pas, bascule quand il atteint TP → clock / (16 × TP) ;
-   - bruit : LFSR 17 bits (rétroaction bits 0 et 3) décalé tous les 2 × NP pas → clock / (16 × NP) ;
-   - enveloppe : un pas tous les 2 × EP pas (16 × EP horloges), 16 niveaux → cycle de 256 × EP horloges.
-   Les écritures horodatées (T-states CPU) sont appliquées à leur instant pendant render().
-   Chaque échantillon audio est la moyenne exacte du signal sur sa durée, puis un passe-haut
-   du premier ordre retire la composante continue. */
+   Model: the chip advances in steps of 8 clock periods (125 kHz on the CPC).
+   - tone: counter incremented on each step, toggles when it reaches TP → clock / (16 × TP);
+   - noise: 17-bit LFSR (feedback from bits 0 and 3) shifted every 2 × NP steps → clock / (16 × NP);
+   - envelope: one step every 2 × EP steps (16 × EP clocks), 16 levels → cycle of 256 × EP clocks.
+   Timestamped writes (CPU T-states) are applied at their instant during render().
+   Each audio sample is the exact average of the signal over its duration, then a
+   first-order high-pass filter removes the DC component. */
 
-// Masques des registres R0–R15
+// Register masks R0–R15
 export const REG_MASK = new Uint8Array([
   0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF, 0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF,
 ]);
 
-// Table de volume logarithmique de l'AY (niveaux mesurés, ~3 dB par pas, 0 = silence)
+// AY logarithmic volume table (measured levels, ~3 dB per step, 0 = silence)
 export const VOLUME = new Float64Array([
   0.0, 0.00999, 0.01445, 0.02106, 0.03070, 0.04555, 0.06450, 0.10736,
   0.12659, 0.20499, 0.29221, 0.37284, 0.49253, 0.63532, 0.80558, 1.0,
 ]);
 
-const B_GAIN = 0.5;                       // voix B mélangée à moitié sur chaque côté
-const NORM = 1 / (1 + B_GAIN);            // trois voix au maximum → 1 sur chaque côté
-const HPF_CUTOFF = 16;                    // Hz, passe-haut de retrait du continu
+const B_GAIN = 0.5;                       // channel B mixed at half level on each side
+const NORM = 1 / (1 + B_GAIN);            // three channels at maximum → 1 on each side
+const HPF_CUTOFF = 16;                    // Hz, DC-removal high-pass
 const MAX_PENDING = 65536;
 
 export class AY38912 {
@@ -32,7 +32,7 @@ export class AY38912 {
     this.name = 'AY-3-8912';
     this.clock = clock;
     this.cpuClock = cpuClock;
-    this.tickT = 8 * cpuClock / clock;    // durée d'un pas interne, en T-states CPU
+    this.tickT = 8 * cpuClock / clock;    // duration of an internal step, in CPU T-states
     this.regs = new Uint8Array(16);
     this.portAInput = () => 0xFF;
     this.reset();
@@ -41,7 +41,7 @@ export class AY38912 {
   reset() {
     this.regs.fill(0);
     this.selected = 0;
-    // État côté audio (registres appliqués à leur instant)
+    // Audio-side state (registers applied at their instant)
     this.ar = new Uint8Array(16);
     this.pending = [];
     this.toneCount = [0, 0, 0];
@@ -53,7 +53,7 @@ export class AY38912 {
     this.envStep = 15;
     this.envAttack = 0;
     this.envHold = false;
-    this.time = 0;                        // instant audio courant (T-states)
+    this.time = 0;                        // current audio time (T-states)
     this.nextTick = this.tickT;
     this.outL = 0;
     this.outR = 0;
@@ -66,7 +66,7 @@ export class AY38912 {
     this.lpR = 0;
   }
 
-  /* ---------- Bus (câblage CPC : PPI port A = données, port C bits 7/6 = BDIR/BC1) ---------- */
+  /* ---------- Bus (CPC wiring: PPI port A = data, port C bits 7/6 = BDIR/BC1) ---------- */
   bus(bdir, bc1, data, t) {
     if (bdir && bc1) { this.selected = data & 0x0F; return undefined; }
     if (bdir) { this.writeRegister(this.selected, data, t); return undefined; }
@@ -90,10 +90,10 @@ export class AY38912 {
     return this.regs[r];
   }
 
-  // Niveau courant de l'enveloppe (0–15), côté audio
+  // Current envelope level (0–15), audio side
   get envLevel() { return this.envStep ^ this.envAttack; }
 
-  /* ---------- Côté audio ---------- */
+  /* ---------- Audio side ---------- */
   applyWrite({ r, v }) {
     this.ar[r] = v;
     if (r === 13) {
@@ -108,12 +108,12 @@ export class AY38912 {
     if (this.envHold) return;
     if (--this.envStep >= 0) return;
     const shape = this.ar[13];
-    if (!(shape & 0x08)) {                // CONT = 0 : retombe à 0 et y reste
+    if (!(shape & 0x08)) {                // CONT = 0: falls to 0 and stays there
       this.envAttack = 0; this.envStep = 0; this.envHold = true;
-    } else if (shape & 0x01) {            // HOLD : reste sur le dernier niveau (inversé si ALT)
+    } else if (shape & 0x01) {            // HOLD: stays on the last level (inverted if ALT)
       if (shape & 0x02) this.envAttack ^= 15;
       this.envStep = 0; this.envHold = true;
-    } else {                              // répétition, en alternant le sens si ALT
+    } else {                              // repeat, alternating direction if ALT
       if (shape & 0x02) this.envAttack ^= 15;
       this.envStep = 15;
     }
@@ -150,7 +150,7 @@ export class AY38912 {
   render(fromT, toT, sampleRate) {
     const spS = this.cpuClock / sampleRate;
     if (sampleRate !== this.rate || fromT !== this.time) {
-      // discontinuité : on repart de fromT en gardant les phases internes
+      // discontinuity: restart from fromT keeping the internal phases
       this.nextTick += fromT - this.time;
       this.time = fromT;
       this.rate = sampleRate;
@@ -191,7 +191,7 @@ export class AY38912 {
         this.updateOutput();
       } else break;
     }
-    while (done < n) emit();              // arrondi flottant sur le dernier échantillon
+    while (done < n) emit();              // floating-point rounding on the last sample
     this.time = toT;
     return { left, right };
   }

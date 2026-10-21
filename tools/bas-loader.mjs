@@ -1,13 +1,13 @@
-// Fabrique un chargeur BASIC (lignes DATA + somme de contrôle) à partir d'un source assembleur.
-// Usage : node tools/bas-loader.mjs exemples/ecran-partage.asm > exemples/ecran-partage.bas
+// Builds a BASIC loader (DATA lines + checksum) from an assembly source.
+// Usage: node tools/bas-loader.mjs examples/split-screen.asm > examples/split-screen.bas
 import { readFileSync } from 'node:fs';
 import { assemble } from '../src/asm/assembler.js';
 
-export function basLoader(source, { title = 'programme', memory, call = [], first = 10, step = 10, before = [], after = [] } = {}) {
+export function basLoader(source, { title = 'program', memory, call = [], first = 10, step = 10, before = [], after = [] } = {}) {
   const res = assemble(source);
-  if (!res.ok) throw new Error(res.errors.map(e => `ligne ${e.line} : ${e.message}`).join('\n'));
+  if (!res.ok) throw new Error(res.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
   const seg = res.segments[0];
-  // les octets nuls de fin (variables, blocs réservés par DS) n'ont pas besoin d'être tapés
+  // trailing zero bytes (variables, blocks reserved by DS) do not need to be typed
   const all = [...seg.bytes];
   let len = all.length;
   while (len > 1 && all[len - 1] === 0) len--;
@@ -21,7 +21,7 @@ export function basLoader(source, { title = 'programme', memory, call = [], firs
     L(`MEMORY &${hex(memory ?? start - 1, 4)}`),
     ...before.map(L),
     L(`s=0:FOR a=&${hex(start, 4)} TO &${hex(end, 4)}:READ o$:o=VAL("&"+o$):POKE a,o:s=s+o:NEXT`),
-    L(`IF s<>${sum} THEN PRINT "Erreur dans les DATA":END`),
+    L(`IF s<>${sum} THEN PRINT "Error in DATA":END`),
     ...after.map(L),
     ...call.map(c => L(`CALL &${hex(c, 4)}`)),
     L('END'),

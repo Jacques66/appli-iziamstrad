@@ -1,5 +1,5 @@
-// Contrôle croisé de deux implémentations indépendantes : le CPU et le désassembleur
-// doivent s'accorder sur les T-states et la longueur de chaque opcode de chaque table.
+// Cross-check of two independent implementations: the CPU and the disassembler
+// must agree on the T-states and the length of every opcode of every table.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Z80 } from '../src/z80/cpu.js';
@@ -21,15 +21,15 @@ function checkOne(bytes) {
   const t = cpu.step();
   const expected = Array.isArray(d.tstates) ? d.tstates : [d.tstates];
   const hex = bytes.slice(0, d.length).map(v => v.toString(16).padStart(2, '0')).join(' ');
-  assert.ok(expected.includes(t), `${hex} « ${d.text} » : CPU ${t} T, désassembleur ${d.tstates}`);
-  // longueur : le PC doit avancer de la longueur décodée quand il n'y a ni saut ni répétition
+  assert.ok(expected.includes(t), `${hex} '${d.text}': CPU ${t} T, disassembler ${d.tstates}`);
+  // length: PC must advance by the decoded length when there is neither a jump nor a repeat
   if (!d.flow && !Array.isArray(d.tstates) && !/^(LD|CP|IN|OT|OU)[ID]R$/.test(d.mnemonic)) {
-    assert.equal(cpu.pc, (BASE + d.length) & 0xFFFF, `${hex} « ${d.text} » : longueur ${d.length}, PC +${cpu.pc - BASE}`);
+    assert.equal(cpu.pc, (BASE + d.length) & 0xFFFF, `${hex} '${d.text}': length ${d.length}, PC +${cpu.pc - BASE}`);
   }
 }
 
 const tables = {
-  'non préfixée': op => [op, 0x05, 0x06, 0x07],
+  unprefixed: op => [op, 0x05, 0x06, 0x07],
   CB: op => [0xCB, op, 0, 0],
   ED: op => [0xED, op, 0x05, 0x06],
   DD: op => [0xDD, op, 0x05, 0x06],
@@ -38,10 +38,10 @@ const tables = {
   FDCB: op => [0xFD, 0xCB, 0xFB, op],
 };
 for (const [name, make] of Object.entries(tables)) {
-  test(`T-states et longueurs identiques — table ${name}`, () => {
+  test(`identical T-states and lengths — ${name} table`, () => {
     const errors = [];
     for (let op = 0; op < 256; op++) {
-      if (name === 'non préfixée' && [0xCB, 0xDD, 0xED, 0xFD].includes(op)) continue;
+      if (name === 'unprefixed' && [0xCB, 0xDD, 0xED, 0xFD].includes(op)) continue;
       if ((name === 'DD' || name === 'FD') && op === 0xCB) continue;
       check(make(op), errors);
     }

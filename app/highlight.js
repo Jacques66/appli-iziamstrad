@@ -4,7 +4,7 @@ const MNEM = new Set('LD LDI LDIR LDD LDDR PUSH POP EX EXX ADD ADC SUB SBC AND O
 const DIRS = new Set('ORG EQU DB DW DS DEFB DEFW DEFS DM DEFM END INCLUDE ALIGN'.split(' '));
 const REGS = new Set("A B C D E H L F AF BC DE HL IX IY SP I R AF' IXH IXL IYH IYL HX LX HY LY Z NZ NC PO PE P M".split(' '));
 
-// Colore une ligne de source ; `symbols` = ensemble des noms connus (majuscules)
+// Colors one source line; `symbols` = set of known names (upper case)
 export function highlight(line, symbols = new Set()) {
   let code = line, comment = '', inStr = false;
   for (let i = 0; i < line.length; i++) {

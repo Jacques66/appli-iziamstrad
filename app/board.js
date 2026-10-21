@@ -1,8 +1,8 @@
 import { $, $$, esc, S } from './util.js';
 import { SIGS } from './analyzer.js';
 
-/* Rendu d'une carte (voir boards.js) : circuits cliquables (inspecteur), lignes cliquables
-   (ajout au chronogramme), circuits et lignes actifs au T-state courant. */
+/* Board rendering (see boards.js): clickable chips (inspector), clickable wires
+   (added to the timing diagram), chips and wires active at the current T-state. */
 
 let ctx = null;   // { board, machine, onSignal, onOpen }
 let selected = 'z80';
@@ -49,7 +49,7 @@ export function buildBoard(context) {
   selectChip(selected);
 }
 
-// écouteurs posés une seule fois (le contenu du SVG est reconstruit à chaque changement de machine)
+// listeners attached once (the SVG content is rebuilt on every machine change)
 export function initBoardEvents() {
   const svg = $('#board-svg');
   svg.addEventListener('click', e => {
@@ -66,7 +66,7 @@ export function initBoardEvents() {
     if (!wg) { tip.hidden = true; return; }
     const w = ctx.board.wires.find(v => v.id === wg.dataset.w), box = $('.board-svg-wrap').getBoundingClientRect();
     tip.hidden = false;
-    tip.innerHTML = `${esc(w.label)}${w.sig.length ? ' <span class="muted">· clic : ajouter au chronogramme</span>' : ''}`;
+    tip.innerHTML = `${esc(w.label)}${w.sig.length ? ' <span class="muted">· click: add to timing diagram</span>' : ''}`;
     tip.style.left = (e.clientX - box.left + 14) + 'px';
     tip.style.top = (e.clientY - box.top + 12) + 'px';
   });
@@ -87,7 +87,7 @@ function openInside(id) {
 
 export function chipBlocks(id) {
   const c = ctx.board.chips.find(x => x.id === id), info = ctx.board.info[id];
-  return { name: c.name, sub: c.sub, blocks: info.blocks || [['Logique interne', info.role, '']], regs: ctx.board.regs(id, ctx.machine) };
+  return { name: c.name, sub: c.sub, blocks: info.blocks || [['Internal logic', info.role, '']], regs: ctx.board.regs(id, ctx.machine) };
 }
 
 export function selectChip(id) {
@@ -97,9 +97,9 @@ export function selectChip(id) {
   $('#inspector').innerHTML = `
     <h3>${c.name}</h3><div class="sub">${c.sub}${c.ref ? ' · ' + c.ref : ''}</div>
     <p>${info.role}</p>
-    ${regs.length ? `<div class="sect">État</div><table>${regs.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>` : ''}
-    ${info.sigs.length ? `<div class="sect">Signaux (clic : chronogramme)</div><div class="sigchips">${info.sigs.filter(s => SIGS[s]).map(s => `<span data-s="${s}">${SIGS[s].name}</span>`).join('')}</div>` : ''}
-    <button class="tb primary" data-in="${id}">${info.cpu ? 'Ouvrir la vue intérieure du CPU →' : info.ext ? "Voir dans l'onglet Machine →" : "Voir l'intérieur du circuit →"}</button>`;
+    ${regs.length ? `<div class="sect">State</div><table>${regs.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>` : ''}
+    ${info.sigs.length ? `<div class="sect">Signals (click: timing diagram)</div><div class="sigchips">${info.sigs.filter(s => SIGS[s]).map(s => `<span data-s="${s}">${SIGS[s].name}</span>`).join('')}</div>` : ''}
+    <button class="tb primary" data-in="${id}">${info.cpu ? 'Open the CPU inside view →' : info.ext ? 'Show in the Machine tab →' : 'Look inside the chip →'}</button>`;
 }
 
 export function updateBoard(step) {

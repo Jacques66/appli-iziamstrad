@@ -1,16 +1,16 @@
-/* Gate Array 40010 : palette, mode écran, sélection des ROM, compteur d'interruptions,
-   et génération de l'image (2 octets de RAM vidéo par µs → 16 pixels). */
+/* Gate Array 40010: palette, screen mode, ROM selection, interrupt counter,
+   and image generation (2 bytes of video RAM per µs → 16 pixels). */
 
-// numéro de couleur matérielle → couleur firmware (0–26)
+// hardware colour number → firmware colour (0–26)
 const HW_TO_FW = [13, 13, 19, 25, 1, 7, 10, 16, 7, 25, 24, 26, 6, 8, 15, 17, 1, 19, 18, 20, 0, 2, 9, 11, 4, 22, 21, 23, 3, 5, 12, 14];
 const LEVEL = [0x00, 0x6E, 0xFF];
-// couleur firmware n = 9·vert + 3·rouge + bleu, chaque composante sur 3 niveaux
+// firmware colour n = 9·green + 3·red + blue, each component on 3 levels
 export const FW_RGB = [...Array(27)].map((_, n) => [LEVEL[Math.floor(n / 3) % 3], LEVEL[Math.floor(n / 9)], LEVEL[n % 3]]);
 export const HW_RGB = HW_TO_FW.map(f => FW_RGB[f]);
 export const hwToFirmware = hw => HW_TO_FW[hw & 31];
 const GREEN = FW_RGB.map(([r, g, b]) => { const y = Math.round(0.3 * r + 0.59 * g + 0.11 * b); return [Math.round(y * 0.25), y, Math.round(y * 0.35)]; });
 
-// décodage des octets vidéo : 8 « points » de largeur mode 2 par octet
+// video byte decoding: 8 mode-2-wide 'dots' per byte
 const DECODE = [0, 1, 2].map(mode => {
   const t = new Uint8Array(256 * 8);
   for (let b = 0; b < 256; b++) {
@@ -29,7 +29,7 @@ const DECODE = [0, 1, 2].map(mode => {
   return t;
 });
 
-// zone visible du moniteur, en caractères (µs) et en lignes, comptées depuis les synchros
+// visible monitor area, in characters (µs) and lines, counted from the syncs
 export const SCREEN_W = 768, SCREEN_H = 272;
 const VIS_X0 = 14, VIS_Y0 = 36;
 
@@ -48,7 +48,7 @@ export class GateArray {
 
   reset() {
     this.pen = 0;
-    this.inks = new Uint8Array(17).fill(0x14);   // noir
+    this.inks = new Uint8Array(17).fill(0x14);   // black
     this.mode = 1; this.pendingMode = 1;
     this.lowerRom = true; this.upperRom = true;
     this.ramConfig = 0;
@@ -64,7 +64,7 @@ export class GateArray {
     this.rgba = pal.map(([r, g, b]) => (0xFF << 24) | (b << 16) | (g << 8) | r);
   }
 
-  // écriture sur le port &7Fxx (le PAL 40030 traite la fonction 3 : configuration RAM)
+  // write to port &7Fxx (the PAL 40030 handles function 3: RAM configuration)
   write(v) {
     switch (v >> 6) {
       case 0: this.pen = v & 0x10 ? 16 : v & 0x0F; break;
@@ -79,7 +79,7 @@ export class GateArray {
     }
   }
 
-  // acquittement de l'interruption par le Z80 : le bit 5 du compteur est effacé
+  // interrupt acknowledge by the Z80: bit 5 of the counter is cleared
   intAck() {
     this.intRequest = false;
     this.intCounter &= 0x1F;
@@ -104,7 +104,7 @@ export class GateArray {
     this.onFrame?.();
   }
 
-  // un caractère (1 µs) : 16 pixels de largeur mode 2 à la position du faisceau
+  // one character (1 µs): 16 mode-2-wide pixels at the beam position
   render(ram) {
     const c = this.crtc;
     const x = this.beamX - VIS_X0, y = this.beamY - VIS_Y0;

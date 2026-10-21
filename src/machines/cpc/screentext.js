@@ -1,5 +1,5 @@
-/* Lit le texte affiché à l'écran du CPC en comparant chaque cellule 8×8 à la police
-   de la ROM système (&3800). Fonctionne dans les trois modes, pour un texte à une seule encre. */
+/* Reads the text shown on the CPC screen by comparing each 8×8 cell with the font
+   of the system ROM (&3800). Works in all three modes, for single-ink text. */
 
 export function screenText(m) {
   const crtc = m.crtc, R = crtc.regs, mode = m.ga.mode;
@@ -9,7 +9,7 @@ export function screenText(m) {
     const key = [...font.subarray(c * 8, c * 8 + 8)].join(',');
     if (!glyphs.has(key)) glyphs.set(key, c);
   }
-  const charBytes = mode === 2 ? 1 : mode === 1 ? 2 : 4;      // octets par caractère de 8 pixels
+  const charBytes = mode === 2 ? 1 : mode === 1 ? 2 : 4;      // bytes per 8-pixel character
   const cols = (R[1] * 2) / charBytes, rows = R[6];
   const base = ((R[12] << 8) | R[13]) & 0x3FFF;
   const pixel = (b, p) => {

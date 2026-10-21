@@ -11,7 +11,7 @@ export function S(tag, attrs = {}, parent, text) {
   return e;
 }
 export const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-// « &4000 », « #4000 », « $4000 », « 0x4000 », « 4000h » ou décimal
+// "&4000", "#4000", "$4000", "0x4000", "4000h" or decimal
 export function parseNum(s) {
   s = String(s).trim();
   let m;

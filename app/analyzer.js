@@ -1,7 +1,7 @@
 import { $, hex, S, cssVar } from './util.js';
 
-/* Analyseur logique : reconstruit les signaux du bus à partir des cycles machine réels.
-   1 unité = 1/8 de T-state (31,25 ns à 4 MHz) ; un demi-T = 4 unités. */
+/* Logic analyzer: rebuilds the bus signals from the actual machine cycles.
+   1 unit = 1/8 T-state (31.25 ns at 4 MHz); half a T = 4 units. */
 
 export const SIGS = {
   CLK: { name: 'CLK', kind: 'bit', c: '--clk' },
@@ -16,7 +16,7 @@ export const SIGS = {
   HSYNC: { name: 'HSYNC', kind: 'bit', c: '--video' }, VSYNC: { name: 'VSYNC', kind: 'bit', c: '--video' },
 };
 
-// Signaux élémentaires d'un cycle, demi-T par demi-T
+// Elementary signals of a cycle, half-T by half-T
 function cycleHalves(c) {
   const out = [];
   const nT = c.t;
@@ -61,8 +61,8 @@ function cycleHalves(c) {
   return out;
 }
 
-/* cycles : liste de { type, addr, data, t, refresh, label?, leds } (X compris, avec addr hérité)
-   ctx : { leds0, switches, intLine, halted } */
+/* cycles: list of { type, addr, data, t, refresh, label?, leds } (X included, with inherited addr)
+   ctx: { leds0, switches, intLine, halted } */
 export function buildTrace(cycles, ctx) {
   const T = {}; Object.keys(SIGS).forEach(k => { T[k] = []; });
   const marks = [];
@@ -144,12 +144,12 @@ export function renderLA(trace) {
   const cur = LA.cursor == null ? N - 1 : Math.min(LA.cursor, N - 1);
   if (N) {
     S('line', { x1: cur * px, y1: 0, x2: cur * px, y2: H, stroke: '#fff', 'stroke-opacity': .8 }, svg);
-    $('#la-cur').innerHTML = `Curseur : <b>T${Math.floor(cur / 8) + 1}</b> · <b>${(cur * 31.25).toLocaleString('fr-FR')} ns</b>`;
+    $('#la-cur').innerHTML = `Cursor: <b>T${Math.floor(cur / 8) + 1}</b> · <b>${(cur * 31.25).toLocaleString('en-US')} ns</b>`;
   }
-  $('#la-names').innerHTML = `<div class="ruler">signal<span class="v">valeur</span></div>` + LA.sigs.map(s => {
+  $('#la-names').innerHTML = `<div class="ruler">signal<span class="v">value</span></div>` + LA.sigs.map(s => {
     const def = SIGS[s], v = N ? T[s][cur] : null;
     const vs = v == null ? 'Z' : def.kind === 'bit' ? v : hex(v, def.n);
-    return `<div class="${LA.fresh === s ? 'new' : ''}"><i style="background:var(${def.c})"></i>${def.name}<span class="v">${vs}</span><span class="x" data-x="${s}" title="Retirer">×</span></div>`;
+    return `<div class="${LA.fresh === s ? 'new' : ''}"><i style="background:var(${def.c})"></i>${def.name}<span class="v">${vs}</span><span class="x" data-x="${s}" title="Remove">×</span></div>`;
   }).join('');
   LA.fresh = null;
   if (LA.follow && LA.cursor == null) { const w = $('#la-wave'); w.scrollLeft = w.scrollWidth; }
